@@ -7,6 +7,7 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 import pyautogui
 import requests
+import cv2
 
 
 class IPManager:
@@ -616,4 +617,69 @@ class Macro:
             JumpManager.jump_to_madatuzukeru()
             HandleRecaptcha.capture_screenshot("negirai")
             JumpManager.jump_to_status()
+
+
+class ImageRecognizer:
+    IMAGE_PARAMS = {
+        "champ": {"filename": "champ.png", "confidence": 0.85, "region": (11, 124, 1120, 815)},
+        "forced-champ": {"filename": "forced-champ.png", "confidence": 0.75, "region": (557, 220, 1342, 810)},
+        "anti-macro-01": {"filename": "anti-macro-01.png", "confidence": 0.9, "region": (9, 131, 344, 336)},
+        "mada-tudukeru": {"filename": "mada-tudukeru.png", "confidence": 0.8, "region": (1, 124, 826, 899)},
+        "to-status": {"filename": "to-status.png", "confidence": 0.8, "region": (8, 118, 633, 916)},
+        "go-to-manomori": {"filename": "manomori-pulldown-2.png", "confidence": 0.8, "region": (717, 236, 1174, 779)},
+        "in-manomori": {"filename": "in-manomori.png", "confidence": 0.8, "region": (2, 116, 563, 871)},
+        "manomori-win": {"filename": "manomori-win.png", "confidence": 0.8, "region": (8, 138, 595, 890)},
+        "go-to-champ": {"filename": "champ.png", "confidence": 0.8, "region": (11, 130, 1006, 597)},
+        "anti-macro-02": {"filename": "anti-macro-02.png", "confidence": 0.9, "region": (5, 133, 340, 327)},
+        "anti-macro-00": {"filename": "anti-macro-00.png", "confidence": 0.9, "region": (61, 110, 608, 669)},
+        "radio-button-2": {"filename": "radio-button.png", "confidence": 0.9, "region": (313, 120, 1143, 905)},
+        "kouseki-shiro": {"filename": "shiro-2.png", "confidence": 0.7, "region": (377, 120, 1141, 913)},
+        "kouseki-mizu": {"filename": "mizu.png", "confidence": 0.7, "region": (334, 119, 1071, 914)},
+        "kouseki-hi": {"filename": "fire.png", "confidence": 0.7, "region": (293, 123, 1102, 909)},
+        "kouseki-zya": {"filename": "zya.png", "confidence": 0.7, "region": (437, 126, 920, 900)},
+        "kouseki": {"filename": "kouseki.png", "confidence": 0.85, "region": (322, 119, 1079, 913)},
+        "acu-shuppin": {"filename": "shuppin.png", "confidence": 0.75, "region": (760, 123, 848, 902)},
+        "back-to-auc": {"filename": "back-to-auc.png", "confidence": 0.8, "region": (2, 125, 453, 801)},
+        "keitai": {"filename": "keitai.png", "confidence": 0.9, "region": (1, 122, 788, 450)},
+        "cloudflare-check": {"filename": "cloudflare-check.png", "confidence": 0.8, "region": (1, 125, 619, 853)},
+        "cloudflare-success": {"filename": "cloudflare-success.png", "confidence": 0.8, "region": (1, 123, 644, 783)},
+        "recaptcha-check": {"filename": "recaptcha-check.png", "confidence": 0.8, "region": (1, 120, 793, 907)},
+        "recaptcha-success": {"filename": "recaptcha-success.png", "confidence": 0.8, "region": (1, 122, 725, 912)},
+        "is-auc": {"filename": "is-auction.png", "confidence": 0.8, "region": (1, 217, 549, 314)},
+        "is-shuppin": {"filename": "is-shuppin.png", "confidence": 0.8, "region": (384, 144, 1038, 560)},
+        "shuppin-done": {"filename": "shuppin-done.png", "confidence": 0.8, "region": (1, 120, 539, 239)},
+        "is-champ": {"filename": "is-champ.png", "confidence": 0.8, "region": (5, 122, 1877, 163)},
+        "cloudflare-check-02": {"filename": "cloudflare-check-02.png", "confidence": 0.8, "region": (1, 122, 1082, 885)},
+        "cloudflare-success-02": {"filename": "cloudflare-success-02.png", "confidence": 0.8, "region": (1, 122, 1137, 909)},
+        "is-madatuzukeru": {"filename": "is-madatuzukeru.png", "confidence": 0.8, "region": (1, 121, 872, 899)},
+        "go-to-last": {"filename": "last-pulldown.png", "confidence": 0.75, "region": (888, 201, 1006, 718)},
+        "in-last": {"filename": "in-last.png", "confidence": 0.8, "region": (1, 112, 1079, 573)},
+        "error": {"filename": "error.png", "confidence": 0.8, "region": (1, 120, 1904, 667)},
+        "chara": {"filename": "chara.png", "confidence": 0.8, "region": (1, 124, 1411, 786)},
+        "is-chara": {"filename": "is-chara.png", "confidence": 0.9, "region": (1, 124, 681, 433)},
+        "shi-no": {"filename": "shi-no.png", "confidence": 0.75, "region": (1, 125, 945, 904)},
+        "souko": {"filename": "souko.png", "confidence": 0.8, "region": (2, 127, 982, 902)},
+        "sell": {"filename": "sell.png", "confidence": 0.8, "region": (3, 122, 956, 906)},
+        "bougu-ya": {"filename": "bougu-ya.png", "confidence": 0.8, "region": (2, 123, 1205, 738)},
+        "is-bougu-ya": {"filename": "is-bougu-ya.png", "confidence": 0.8, "region": (1, 126, 1063, 891)}
+    }
+
+    @staticmethod
+    def locate_center(key):
+        params = ImageRecognizer.IMAGE_PARAMS.get(key)
+        if not params:
+            print(f"⚠️ '{key}' の画像パラメータが登録されていません。")
+            return None
+        return pyautogui.locateCenterOnScreen(
+            params["filename"], confidence=params["confidence"], region=params["region"])
+
+    @staticmethod
+    def locate_all(key):
+        params = ImageRecognizer.IMAGE_PARAMS.get(key)
+        if not params:
+            print(f"⚠️ '{key}' の画像パラメータが登録されていません。")
+            return []
+        return list(pyautogui.locateAllOnScreen(
+            params["filename"], confidence=params["confidence"], region=params["region"]
+        ))
 
