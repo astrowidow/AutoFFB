@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 import pyautogui
 import requests
 import cv2
+import numpy as np
 
 
 class IPManager:
@@ -148,7 +149,7 @@ class JumpHandler:
 
     def jump_with_confirmation_core(self, jump_key, wait_key, time_after_key_down, time_after_confirmation, offset_x=0,
                                     offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True):
-        location = pyautogui.locateCenterOnScreen(f"{jump_key}.png", confidence=0.8)
+        location = ImageRecognizer.locate_center(jump_key)
         if location:
             print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
 
@@ -181,12 +182,12 @@ class JumpHandler:
     def wait_for_transition(self, wait_key, react_keitai=True, react_error=True, waiting_interval=50):
         start_time = time.time()
         while time.time() - start_time < self.transition_timeout:
-            if pyautogui.locateCenterOnScreen(f"{wait_key}.png", confidence=0.8):
+            if ImageRecognizer.locate_center(wait_key):
                 return time.time() - start_time, "PageTransition"
-            elif pyautogui.locateCenterOnScreen("keitai.png", confidence=0.8):
+            elif ImageRecognizer.locate_center("keitai"):
                 if react_keitai:
                     return time.time() - start_time, "KeitaiInterrupt"
-            elif pyautogui.locateCenterOnScreen("error.png", confidence=0.8):
+            elif ImageRecognizer.locate_center("error"):
                 if react_error:
                     return time.time() - start_time, "ErrorInterrupt"
             time.sleep(waiting_interval/1000)
@@ -249,7 +250,7 @@ class JumpManager:
     @staticmethod
     def jump_to_next_makyo(wait_key):
         jump_key = "manomori-win"
-        if pyautogui.locateCenterOnScreen(f"{wait_key}.png", confidence=0.8):
+        if ImageRecognizer.locate_center(wait_key):
             time_after_confirmation = (18549, 26636)
         else:
             time_after_confirmation = (2049, 2336)
@@ -266,19 +267,19 @@ class Action:
     def home():
         pyautogui.press("home")
         time.sleep(0.5)  # 500ms
-        if not pyautogui.locateCenterOnScreen("isStatus.png", confidence=0.8):
+        if not ImageRecognizer.locate_center("isStatus"):
             pyautogui.press("end")
             time.sleep(0.5)
             JumpManager.jump_to_status()
 
     @staticmethod
     def go_to_manomori():
-        if pyautogui.locateCenterOnScreen("go-to-manomori.png", confidence=0.8):
+        if ImageRecognizer.locate_center("go-to-manomori"):
             JumpManager.jump_to_manomori()
 
     @staticmethod
     def go_to_challenge_character():
-        if pyautogui.locateCenterOnScreen("chara.png", confidence=0.8):
+        if ImageRecognizer.locate_center("chara"):
             JumpManager.jump_to_challenge_character()
             pyautogui.press("tab")
             time.sleep(0.2)
@@ -304,12 +305,12 @@ class Action:
 
     @staticmethod
     def go_to_saishu():
-        if pyautogui.locateCenterOnScreen("go-to-manomori.png", confidence=0.8):
+        if ImageRecognizer.locate_center("go-to-manomori"):
             JumpManager.jump_to_saishu()
 
     @staticmethod
     def go_to_champ():
-        if pyautogui.locateCenterOnScreen("forced-champ.png", confidence=0.8):
+        if ImageRecognizer.locate_center("forced-champ"):
             JumpManager.jump_to_champ()
             pyautogui.press("end")
             time.sleep(0.5)
@@ -317,20 +318,20 @@ class Action:
 
     @staticmethod
     def go_to_next_manomori():
-        if pyautogui.locateCenterOnScreen("in-manomori.png", confidence=0.8):
+        if ImageRecognizer.locate_center("in-manomori"):
             pyautogui.press("end")
             time.sleep(0.5)
-            if pyautogui.locateCenterOnScreen("manomori-win.png", confidence=0.8):
+            if ImageRecognizer.locate_center("manomori-win"):
                 JumpManager.jump_to_next_manomori()
             else:
                 JumpManager.jump_to_status()
 
     @staticmethod
     def go_to_next_saishu():
-        if pyautogui.locateCenterOnScreen("in-last.png", confidence=0.8):
+        if ImageRecognizer.locate_center("in-last"):
             pyautogui.press("end")
             time.sleep(0.5)
-            if pyautogui.locateCenterOnScreen("manomori-win.png", confidence=0.8):
+            if ImageRecognizer.locate_center("manomori-win"):
                 JumpManager.jump_to_next_saishu()
             else:
                 JumpManager.jump_to_status()
@@ -338,7 +339,7 @@ class Action:
     @staticmethod
     def go_to_sell_all_gomi_kouseki(collect_various_kouseki):
         Action.home()
-        if pyautogui.locateCenterOnScreen("auc.png", confidence=0.8):
+        if ImageRecognizer.locate_center("auc"):
             JumpManager.jump_to_auction_from_status()
             pyautogui.press("end")
             time.sleep(1)
@@ -349,7 +350,7 @@ class Action:
     @staticmethod
     def go_to_sell_all_gomi_yoroi():
         Action.home()
-        if pyautogui.locateCenterOnScreen("bougu-ya.png", confidence=0.8):
+        if ImageRecognizer.locate_center("bougu-ya"):
             JumpManager.jump_to_bougu()
             Action.sell_loop_all_gomi_yoroi()
         Action.home()
@@ -360,11 +361,11 @@ class Action:
         lower_limit_yoroi = 0
 
         while True:
-            result_souko = pyautogui.locateCenterOnScreen("souko.png", confidence=0.8)
+            result_souko = ImageRecognizer.locate_center("souko")
             if result_souko:
                 lower_limit_yoroi = result_souko[1]
-                results_shino = list(pyautogui.locateAllOnScreen("shi-no.png", confidence=0.8))
-                results_sell = list(pyautogui.locateAllOnScreen("sell.png", confidence=0.8))
+                results_shino = ImageRecognizer.locate_all("shi-no")
+                results_sell = ImageRecognizer.locate_all("sell")
 
                 if results_sell:
                     click_ok = True
@@ -398,14 +399,14 @@ class Action:
         while True:
             pyautogui.press("end")
             time.sleep(3)
-            result_kouseki = pyautogui.locateCenterOnScreen("kouseki.png", confidence=0.8)
+            result_kouseki = ImageRecognizer.locate_center("kouseki")
             if result_kouseki:
                 lower_limit_kouseki = result_kouseki[1]
-            results_shiro = list(pyautogui.locateAllOnScreen("kouseki-shiro.png", confidence=0.8))
-            results_mizu = list(pyautogui.locateAllOnScreen("kouseki-mizu.png", confidence=0.8))
-            results_hi = list(pyautogui.locateAllOnScreen("kouseki-hi.png", confidence=0.8))
-            results_zya = list(pyautogui.locateAllOnScreen("kouseki-zya.png", confidence=0.8))
-            results_radio = list(pyautogui.locateAllOnScreen("radio-button-2.png", confidence=0.8))
+            results_shiro = ImageRecognizer.locate_all("kouseki-shiro")
+            results_mizu = ImageRecognizer.locate_all("kouseki-mizu")
+            results_hi = ImageRecognizer.locate_all("kouseki-hi")
+            results_zya = ImageRecognizer.locate_all("kouseki-zya")
+            results_radio = ImageRecognizer.locate_all("radio-button-2")
 
             if results_radio:
                 click_ok = True
@@ -457,11 +458,11 @@ class Action:
         while True:
             pyautogui.press("end")
             time.sleep(3)
-            results_shiro = list(pyautogui.locateAllOnScreen("kouseki-shiro.png", confidence=0.8))
-            results_mizu = list(pyautogui.locateAllOnScreen("kouseki-mizu.png", confidence=0.8))
-            results_hi = list(pyautogui.locateAllOnScreen("kouseki-hi.png", confidence=0.8))
-            results_zya = list(pyautogui.locateAllOnScreen("kouseki-zya.png", confidence=0.8))
-            results_radio = list(pyautogui.locateAllOnScreen("radio-button-2.png", confidence=0.8))
+            results_shiro = ImageRecognizer.locate_all("kouseki-shiro")
+            results_mizu = ImageRecognizer.locate_all("kouseki-mizu")
+            results_hi = ImageRecognizer.locate_all("kouseki-hi")
+            results_zya = ImageRecognizer.locate_all("kouseki-zya")
+            results_radio = ImageRecognizer.locate_all("radio-button-2")
 
             if results_radio:
                 click_ok = False
@@ -525,7 +526,7 @@ class HandleRecaptcha:
 
         print("CAPTCHAのチェックボタンが描画されるのを待ちます。")
         while True:
-            if any(pyautogui.locateCenterOnScreen(f"{key}.png", confidence=0.8) for key in wait_keys):
+            if any(ImageRecognizer.locate_center(key) for key in wait_keys):
                 break
             time.sleep(waiting_interval)
 
@@ -599,7 +600,7 @@ class Macro:
 
     @staticmethod
     def hundle_keitai_denwa():
-        if pyautogui.locateCenterOnScreen("keitai.png", confidence=0.8):
+        if ImageRecognizer.locate_center("keitai"):
             HandleRecaptcha.wait_for_captcha_ready()
             HandleRecaptcha.capture_screenshot("before")
 
@@ -610,7 +611,7 @@ class Macro:
             ]
 
             for check_key, wait_key in checks:
-                if pyautogui.locateCenterOnScreen(f"{check_key}.png", confidence=0.8):
+                if ImageRecognizer.locate_center(check_key):
                     HandleRecaptcha.check_recaptcha(check_key, wait_key)
 
             HandleRecaptcha.capture_screenshot("after")
@@ -660,9 +661,14 @@ class ImageRecognizer:
         "shi-no": {"filename": "shi-no.png", "confidence": 0.75, "region": (1, 125, 945, 904)},
         "souko": {"filename": "souko.png", "confidence": 0.8, "region": (2, 127, 982, 902)},
         "sell": {"filename": "sell.png", "confidence": 0.8, "region": (3, 122, 956, 906)},
+        "isStatus": {"filename": "is-status.png", "confidence": 0.85, "region": (17, 127, 961, 635)},
+        "auc": {"filename": "auc.png", "confidence": 0.85, "region": (163, 218, 973, 598)},
+        "go-to-shuppin": {"filename": "to-shuppin.png", "confidence": 0.8, "region": (1, 127, 618, 900)},
         "bougu-ya": {"filename": "bougu-ya.png", "confidence": 0.8, "region": (2, 123, 1205, 738)},
         "is-bougu-ya": {"filename": "is-bougu-ya.png", "confidence": 0.8, "region": (1, 126, 1063, 891)}
     }
+
+    IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
 
     @staticmethod
     def locate_center(key):
@@ -670,8 +676,28 @@ class ImageRecognizer:
         if not params:
             print(f"⚠️ '{key}' の画像パラメータが登録されていません。")
             return None
-        return pyautogui.locateCenterOnScreen(
-            params["filename"], confidence=params["confidence"], region=params["region"])
+
+        filename = os.path.join(ImageRecognizer.IMAGE_FOLDER, params["filename"])
+        region = params["region"]
+        confidence = params["confidence"]
+
+        screenshot = pyautogui.screenshot(region=region)
+        screenshot = np.array(screenshot)
+        screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
+
+        template = cv2.imread(filename, cv2.IMREAD_COLOR)
+        if template is None:
+            print(f"⚠️ '{filename}' の画像が見つかりませんでした。")
+            return None
+
+        result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+        min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(result)
+
+        if max_val < confidence:
+            return None
+
+        h, w = template.shape[:2]
+        return (max_loc[0] + w // 2, max_loc[1] + h // 2)
 
     @staticmethod
     def locate_all(key):
@@ -679,7 +705,23 @@ class ImageRecognizer:
         if not params:
             print(f"⚠️ '{key}' の画像パラメータが登録されていません。")
             return []
-        return list(pyautogui.locateAllOnScreen(
-            params["filename"], confidence=params["confidence"], region=params["region"]
-        ))
+
+        filename = os.path.join(ImageRecognizer.IMAGE_FOLDER, params["filename"])
+        region = params["region"]
+        confidence = params["confidence"]
+
+        screenshot = pyautogui.screenshot(region=region)
+        screenshot = np.array(screenshot)
+        screenshot = cv2.cvtColor(screenshot, cv2.COLOR_RGB2BGR)
+
+        template = cv2.imread(filename, cv2.IMREAD_COLOR)
+        if template is None:
+            print(f"⚠️ '{filename}' の画像が見つかりませんでした。")
+            return []
+
+        result = cv2.matchTemplate(screenshot, template, cv2.TM_CCOEFF_NORMED)
+        loc = np.where(result >= confidence)
+
+        h, w = template.shape[:2]
+        return [(pt[0] + w // 2, pt[1] + h // 2) for pt in zip(*loc[::-1])]
 
