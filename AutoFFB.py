@@ -13,6 +13,8 @@ import cv2
 import numpy as np
 import pyscreeze as pysc
 import PIL as PIL  # pillowで検索
+from scipy.interpolate import interp1d
+import matplotlib.pyplot as plt
 
 
 class IPManager:
@@ -801,7 +803,7 @@ class HandleRecaptcha:
     def check_recaptcha(jump_key, wait_key):
         notifier = Notifier()
 
-        time_after_confirmation = random.randint(849, 1036)  # 849 + Random(0, 187)
+        time_after_confirmation = random.randint(349, 836)  # 849 + Random(0, 187)
         check_success = False
         start_time = time.time()
         while time.time() - start_time < 600:
@@ -812,21 +814,25 @@ class HandleRecaptcha:
 
                 # 人間っぽい動きにするために細かく制御
                 # ... 指定座標までマウスを移動させる
-                pointer_moving_duration = random.randint(0, 145) / 1000
+                pointer_moving_duration = random.randint(1188, 2105) / 1000
+                start_x = random.randint(400, 1800)
+                start_y = random.randint(500, 800)
                 target_x = location[0] + random.randint(-5, 5)
                 target_y = location[1] + random.randint(-5, 5)
                 print(f"id: {jump_key}, x: {target_x}, y: {target_y}")
-                pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
+                HandleRecaptcha.human_like_mouse_move((start_x, start_y), (target_x, target_y), pointer_moving_duration)
                 # ... クリック
-                click_duration = random.randint(32, 282) / 1000
+                click_duration = random.randint(32, 582) / 1000
                 pyautogui.mouseDown()
                 time.sleep(click_duration)
                 pyautogui.mouseUp()
                 # ... クリック後遠ざかる
-                pointer_moving_duration = random.randint(25, 1242) / 1000
-                target_x = location[0] + random.randint(0, 540)
-                target_y = location[1] + random.randint(0, 340)
-                pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
+                pointer_moving_duration = random.randint(1530, 2242) / 1000
+                start_x = target_x
+                start_y = target_y
+                target_x = location[0] + random.randint(540, 840)
+                target_y = location[1] + random.randint(340, 540)
+                HandleRecaptcha.human_like_mouse_move((start_x, start_y), (target_x, target_y), pointer_moving_duration)
 
                 check_interval = 0.5  # sec
                 while True:
@@ -835,8 +841,8 @@ class HandleRecaptcha:
                         check_success = True
                         break
                     elif ImageRecognizer.locate_center(jump_key):
-                        wait_before_check = random.randint(43, 10045)
-                        time.sleep(wait_before_check / 1000)
+                        # wait_before_check = random.randint(43, 10045)
+                        # time.sleep(wait_before_check / 1000)
                         break
                 if check_success:
                     break
@@ -880,16 +886,111 @@ class HandleRecaptcha:
         screenshot.save(file_path)
         print(f"📸 スクリーンショットを保存しました: {file_path}")
 
+    @classmethod
+    def human_like_mouse_move(cls, start, end, duration=1.5):
+        x1, y1 = start
+        x2, y2 = end
+        num_segments = random.randint(3, 6)  # 分割数をランダム化
+        total_time = duration
+        points = [start]
+
+        prev_x, prev_y = x1, y1
+
+        for _ in range(num_segments - 1):
+            mid_x = np.interp(random.random(), [0, 1], [prev_x, x2])
+            mid_y = np.interp(random.random(), [0, 1], [prev_y, y2])
+            offset_x = random.uniform(-(abs(prev_x - x2) * 0.5), abs(prev_x - x2) * 0.5)
+            offset_y = random.uniform(-(abs(prev_y - y2) * 0.5), abs(prev_y - y2) * 0.5)
+            new_x = int(mid_x + offset_x)
+            new_y = int(mid_y + offset_y)
+            points.append((new_x, new_y))
+            prev_x, prev_y = new_x, new_y
+        points.append(end)
+
+        path = []
+        for i in range(len(points) - 1):
+            p1, p2 = points[i], points[i + 1]
+            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+            mid_x = (p1[0] + p2[0]) / 2 + random.uniform(-abs(dx) * 0.6, abs(dx) * 0.6)
+            mid_y = (p1[1] + p2[1]) / 2 + random.uniform(-abs(dy) * 0.6, abs(dy) * 0.6)
+            p_mid = (int(mid_x), int(mid_y))
+
+            def bezier_curve(t, p0, p1, p2):
+                return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
+
+            t_vals = np.linspace(0, 1, num=30)
+            t_vals = t_vals ** 2 / (t_vals ** 2 + (1 - t_vals) ** 2)  # 加減速を模擬
+
+            for t in t_vals:
+                path.append(bezier_curve(t, p1, p_mid, p2))
+
+        path = np.array(path)
+        total_steps = len(path)
+        step_duration = total_time / total_steps  # 各ステップの時間を調整
+
+        for (x, y) in path:
+            pyautogui.moveTo(int(x), int(y), duration=step_duration)
+            if random.random() < 0.15:
+                time.sleep(random.uniform(0.5 * step_duration, 1.5 * step_duration))
+        pyautogui.moveTo(x2, y2, duration=0.05)
+
+    @classmethod
+    def visualize_path(cls, start, end, duration=1.5):
+        # テスト用
+        x1, y1 = start
+        x2, y2 = end
+        num_segments = random.randint(3, 6)
+        points = [start]
+
+        prev_x, prev_y = x1, y1
+
+        for _ in range(num_segments - 1):
+            mid_x = np.interp(random.random(), [0, 1], [prev_x, x2])
+            mid_y = np.interp(random.random(), [0, 1], [prev_y, y2])
+            offset_x = random.uniform(-(abs(prev_x - x2) * 0.5), abs(prev_x - x2) * 0.5)
+            offset_y = random.uniform(-(abs(prev_y - y2) * 0.5), abs(prev_y - y2) * 0.5)
+            new_x = int(mid_x + offset_x)
+            new_y = int(mid_y + offset_y)
+            points.append((new_x, new_y))
+            prev_x, prev_y = new_x, new_y
+        points.append(end)
+
+        path = []
+        for i in range(len(points) - 1):
+            p1, p2 = points[i], points[i + 1]
+            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+            mid_x = (p1[0] + p2[0]) / 2 + random.uniform(-abs(dx) * 0.2, abs(dx) * 0.2)
+            mid_y = (p1[1] + p2[1]) / 2 + random.uniform(-abs(dy) * 0.2, abs(dy) * 0.2)
+            p_mid = (int(mid_x), int(mid_y))
+
+            def bezier_curve(t, p0, p1, p2):
+                return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
+
+            t_vals = np.linspace(0, 1, num=30)
+            t_vals = t_vals ** 2 / (t_vals ** 2 + (1 - t_vals) ** 2)  # 加減速を模擬
+
+            for t in t_vals:
+                path.append(bezier_curve(t, p1, p_mid, p2))
+
+        path = np.array(path)
+        plt.figure(figsize=(6, 6))
+        plt.plot(path[:, 0], path[:, 1], marker='o', linestyle='-', color='b', label='Mouse Path')
+        plt.scatter(*zip(*points), color='r', label='Control Points')
+        plt.legend()
+        plt.title("Simulated Human-like Mouse Movement with Timing Adjustment")
+        plt.gca().invert_yaxis()
+        plt.show()
+
 
 class Macro:
     @staticmethod
     def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
         notifier = Notifier()
+        vpn_manager = VpnManager()
         idling_time = 0
 
         if ImageRecognizer.locate_center("isStatus"):
             notifier.send_discord_message("✅ FFBオート周回マクロが開始されました。オート周回を開始します。")
-            vpn_manager = VpnManager()
             if vpn_manager.use_vpn:
                 JumpManager.jump_to_vpn_setting()
                 JumpManager.jump_to_vpn_switch_to_turn_on()
@@ -906,6 +1007,9 @@ class Macro:
             login_manager = LoginManager()
             if login_manager.check_account_switch():
                 notifier.send_discord_message("⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
+                if not vpn_manager.use_vpn:
+                    notifier.send_discord_message("⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために40分スリープします。")
+                    time.sleep(40 * 60)
                 Action.reset()
                 notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
 
