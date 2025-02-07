@@ -809,8 +809,24 @@ class HandleRecaptcha:
                 print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
                 # ip_manager = IPManager()
                 # ip_manager.wait_for_ip_recovery()
-                pyautogui.click(location[0], location[1])
+
+                # 人間っぽい動きにするために細かく制御
+                # ... 指定座標までマウスを移動させる
+                pointer_moving_duration = random.randint(525, 1242) / 1000
+                target_x = location[0] + random.randint(-5, 5)
+                target_y = location[1] + random.randint(-5, 5)
+                pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
+                # ... クリック
+                click_duration = random.randint(32, 282) / 1000
+                pyautogui.mouseDown()
+                time.sleep(click_duration)
+                pyautogui.mouseUp()
                 notifier.send_discord_message(f"⚠️ 人間認証チェックを付けました。認証成功するまで無限に待機します。 from:{jump_key} to:{wait_key}")
+                # ... クリック後遠ざかる
+                pointer_moving_duration = random.randint(525, 1242) / 1000
+                target_x = location[0] + random.randint(320, 540)
+                target_y = location[1] + random.randint(220, 340)
+                pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
 
                 check_interval = 0.5  # sec
                 while True:
@@ -821,7 +837,7 @@ class HandleRecaptcha:
                         break
                     elif ImageRecognizer.locate_center(jump_key):
                         notifier.send_discord_message(f"⚠️ 人間認証チェックを付けましたが、認証に失敗しました。再度チェックを付けて認証を試みます。")
-                        wait_before_check = random.randint(1043, 2045)
+                        wait_before_check = random.randint(543, 10045)
                         time.sleep(wait_before_check / 1000)
                         break
                 if check_success:
