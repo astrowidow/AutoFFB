@@ -799,20 +799,40 @@ class Action:
 class HandleRecaptcha:
     @staticmethod
     def check_recaptcha(jump_key, wait_key):
-        time_after_confirmation = (849, 1036)  # 849 + Random(0, 187)
-        JumpHandler(
-            jump_key=jump_key,
-            wait_key=wait_key,
-            time_after_confirmation_range=time_after_confirmation,
-            react_keitai=False,
-            enable_adaptive_wait=False
-        ).jump_with_confirmation()
+        notifier = Notifier()
+
+        time_after_confirmation = random.randint(849, 1036)  # 849 + Random(0, 187)
+        check_success = False
+        while True:
+            location = ImageRecognizer.locate_center(jump_key)
+            if location:
+                print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
+                # ip_manager = IPManager()
+                # ip_manager.wait_for_ip_recovery()
+                pyautogui.click(location[0], location[1])
+                notifier.send_discord_message(f"⚠️ 人間認証チェックを付けました。認証成功するまで無限に待機します。 from:{jump_key} to:{wait_key}")
+
+                check_interval = 0.5  # sec
+                while True:
+                    time.sleep(check_interval)
+                    if ImageRecognizer.locate_center(wait_key):
+                        check_success = True
+                        notifier.send_discord_message(f"️✅ 人間認証に成功しました。")
+                        break
+                    elif ImageRecognizer.locate_center(jump_key):
+                        notifier.send_discord_message(f"⚠️ 人間認証チェックを付けましたが、認証に失敗しました。再度チェックを付けて認証を試みます。")
+                        wait_before_check = random.randint(1043, 2045)
+                        time.sleep(wait_before_check / 1000)
+                        break
+                if check_success:
+                    break
+        time.sleep(time_after_confirmation / 1000)
 
     @staticmethod
     def wait_for_captcha_ready():
-        waiting_interval = 0.2  # 200ms
+        waiting_interval = 0.5  # 500ms
         wait_keys = ["cloudflare-check", "recaptcha-check", "cloudflare-check-02"]
-        time_after_confirmation = random.randint(815, 1129)  # 815 + Random(0, 314)
+        time_after_confirmation = random.randint(515, 629)
 
         print("CAPTCHAのチェックボタンが描画されるのを待ちます。")
         while True:
