@@ -413,15 +413,15 @@ class Notifier:
         """
         full_message = self.generate_prefix()
         if message:
-            full_message += "-----------------------------\n" + message
+            full_message += "---------------------------------------------\n" + message + "---------------------------------------------\n"
 
         data = {"content": full_message}
         response = requests.post(self.webhook_url, json=data)
 
         if response.status_code == 204:
-            print("✅ メッセージ送信成功！")
+            print("✅ discordメッセージ送信成功！")
         else:
-            print(f"⚠️ エラー: {response.status_code}")
+            print(f"⚠️ discordメッセージ送信エラー: {response.status_code}")
             print(response.text)
 
     def send_discord_image(self, image_path: str, caption: str = ""):
@@ -432,7 +432,7 @@ class Notifier:
         """
         full_caption = self.generate_prefix()
         if caption:
-            full_caption += "-----------------------------\n" + caption
+            full_caption += "---------------------------------------------\n" + caption + "---------------------------------------------\n"
 
         with open(image_path, "rb") as image_file:
             files = {"file": image_file}
@@ -461,8 +461,9 @@ class PenaltyCounter:
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def check_penalty(self):
+        dangerous_interval = 5  # hours
         if ImageRecognizer.locate_center("penalty"):
-            if time.time() - self.last_penalty_time > 10800:
+            if time.time() - self.last_penalty_time > dangerous_interval*3600:
                 self.penalty_count = 1
             else:
                 self.penalty_count += 1
@@ -470,11 +471,11 @@ class PenaltyCounter:
 
             notifier = Notifier()
             if self.penalty_count > 5:
-                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、3時間以内に連鎖した警告数は {self.penalty_count}回です。")
+                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、{dangerous_interval}時間以内に連鎖した警告数は {self.penalty_count}回です。")
                 time.sleep(30)
                 Action.reset()
             else:
-                notifier.send_discord_message(f"🚨 3時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。安全のため、プログラムを停止します。")
+                notifier.send_discord_message(f"🚨 {dangerous_interval}時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。安全のため、プログラムを停止します。")
                 sys.exit()
 
 
