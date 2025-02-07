@@ -5,6 +5,7 @@ import random
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
 import pyautogui
 import requests
 import cv2
@@ -45,13 +46,24 @@ class IPManager:
         try:
             options = Options()
             options.debugger_address = "127.0.0.1:9222"  # 既存のChromeセッションに接続
-            service = Service()  # ChromeDriverのパスは自動検出
+
+            # ✅ Pythonスクリプトと同じフォルダにある chromedriver を指定
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            driver_path = os.path.join(script_dir, "chromedriver.exe" if os.name == "nt" else "chromedriver")
+
+            service = Service(executable_path=driver_path)
             driver = webdriver.Chrome(service=service, options=options)
 
-            driver.get("https://api64.ipify.org")
-            ip = driver.find_element("tag name", "body").text.strip()
-            driver.quit()
+            # ✅ C# の `Navigate().GoToUrl()` と同じ動作
+            driver.execute_script("window.location = 'https://api64.ipify.org';")
+
+            # ✅ `<body>` のテキストを取得（即座に実行）
+            element = driver.find_element(By.TAG_NAME, "body")
+            ip = element.text.strip()
+
+            # 🔥 既存の Chrome を閉じないように `driver.close()` を削除
             return ip
+
         except Exception as e:
             print(f"⚠️ Chrome経由でのIP取得エラー: {e}")
             return ""
@@ -113,8 +125,10 @@ class IPManager:
 
 
 class JumpHandler:
+    jump_used = False
+
     def __init__(self, jump_key, wait_key, time_after_key_down=20, time_after_confirmation_range=(5000, 10000),
-                 offset_x=0, offset_y=0, react_keitai=True, enable_adaptive_wait=True):
+                 offset_x=0, offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True):
         self.jump_key = jump_key
         self.wait_key = wait_key
         self.time_after_key_down = time_after_key_down
@@ -122,6 +136,7 @@ class JumpHandler:
         self.offset_x = offset_x
         self.offset_y = offset_y
         self.react_keitai = react_keitai
+        self.react_error = react_error
         self.enable_adaptive_wait = enable_adaptive_wait
         self.transition_timeout = 60
         self.ip_manager = IPManager()  # シングルトンを参照
@@ -134,7 +149,7 @@ class JumpHandler:
             time_after_confirmation=time_after_confirmation,
             offset_x=self.offset_x, offset_y=self.offset_y,
             react_keitai=self.react_keitai, enable_adaptive_wait=self.enable_adaptive_wait,
-            react_error=True
+            react_error=self.react_error
         )
 
         if reason == "ErrorInterrupt":
@@ -147,12 +162,13 @@ class JumpHandler:
                 react_error=False
             )
 
+        JumpHandler.jump_used = True
+
     def jump_with_confirmation_core(self, jump_key, wait_key, time_after_key_down, time_after_confirmation, offset_x=0,
                                     offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True):
         location = ImageRecognizer.locate_center(jump_key)
         if location:
             print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
-
             self.ip_manager.wait_for_ip_recovery()
 
             target_x = location[0] + offset_x
@@ -190,7 +206,7 @@ class JumpHandler:
             elif ImageRecognizer.locate_center("error"):
                 if react_error:
                     return time.time() - start_time, "ErrorInterrupt"
-            time.sleep(waiting_interval/1000)
+            time.sleep(waiting_interval / 1000)
         return self.transition_timeout, "Timeout"
 
 
@@ -261,8 +277,172 @@ class JumpManager:
         JumpHandler("mada-tudukeru", "is-madatuzukeru", time_after_confirmation_range=(1049, 1336),
                     react_keitai=False).jump_with_confirmation()
 
+    @staticmethod
+    def jump_to_vpn_setting():
+        print("VPN設定メニューを開きます。")
+        if ImageRecognizer.locate_center("vpn-icon-on"):
+            JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+        elif ImageRecognizer.locate_center("vpn-icon-off"):
+            JumpHandler("vpn-icon-off", "vpn-window", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+
+    @staticmethod
+    def jump_to_vpn_switch_to_turn_on():
+        print("VPNスイッチをONにします。")
+        if ImageRecognizer.locate_center("vpn-off-state"):
+            JumpHandler("vpn-off-state", "vpn-on-state", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+
+    @staticmethod
+    def jump_to_vpn_switch_to_turn_off():
+        print("VPNスイッチをOFFにします。")
+        if ImageRecognizer.locate_center("vpn-on-state"):
+            JumpHandler("vpn-on-state", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+            # if ImageRecognizer.locate_center("ad-close"):
+            #     JumpHandler("ad-close", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
+            #                 react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+
+    @staticmethod
+    def jump_to_ffb_top_page():
+        print("FFBトップページに移動します。")
+        if ImageRecognizer.locate_center("ffb-icon"):
+            JumpHandler("ffb-icon", "ffb-login", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+        else:
+            assert True, "FFBトップページが見当たりません・・・"
+
+    @staticmethod
+    def jump_to_login_button():
+        if ImageRecognizer.locate_center("ffb-login"):
+            JumpHandler("ffb-login", "isStatus", time_after_confirmation_range=(3049, 5336),
+                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+
+
+class LoginManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(LoginManager, cls).__new__(cls)
+        return cls._instance  # インスタンスを作るだけ（変数の初期化はしない）
+
+    def __init__(self):
+        if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.account_table = {}
+            self.switch_times = []
+            self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+
+    def add_account(self, switch_time, user_id, password):
+        """アカウント情報を追加"""
+        self.account_table[switch_time] = {"id": user_id, "password": password}
+        self.switch_times = sorted(self.account_table.keys())
+
+    def get_current_account(self):
+        """現在の時間に対応するアカウント情報を取得（24時間ループ考慮）"""
+        now = datetime.datetime.now().strftime("%H:%M")
+        for t in reversed(self.switch_times):
+            if t <= now:
+                return self.account_table[t]
+        return self.account_table[self.switch_times[-1]]  # 一番遅い時間をデフォルトに
+
+
+class Notifier:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(Notifier, cls).__new__(cls)
+        return cls._instance  # インスタンスを作るだけ（変数の初期化はしない）
+
+    def __init__(self):
+        if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.webhook_url = ""
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+
+    def add_webhook(self, webhook_url):
+        self.webhook_url = webhook_url
+
+    @staticmethod
+    def generate_prefix():
+        login_manager = LoginManager()
+        pc_name = login_manager.pc_name
+        user_name = login_manager.get_current_account()
+        prefix = f"🖥 **ホスト名:** {pc_name}\n"
+        prefix += f"👤 **ユーザー名:** {user_name}\n"
+        return prefix
+
+    def send_discord_message(self, message: str):
+        """
+        Discordにテキストメッセージを送信する関数
+        :param message: 送信するテキスト
+        """
+        full_message = self.generate_prefix()
+        if message:
+            full_message += "-----------------------------\n" + message
+
+        data = {"content": full_message}
+        response = requests.post(self.webhook_url, json=data)
+
+        if response.status_code == 204:
+            print("✅ メッセージ送信成功！")
+        else:
+            print(f"⚠️ エラー: {response.status_code}")
+            print(response.text)
+
+    def send_discord_image(self, image_path: str, caption: str = ""):
+        """
+        Discordに画像を送信する関数
+        :param image_path: 送信する画像のファイルパス
+        :param caption: 画像と一緒に送るメッセージ（オプション）
+        """
+        full_caption = self.generate_prefix()
+        if caption:
+            full_caption += "-----------------------------\n" + caption
+
+        with open(image_path, "rb") as image_file:
+            files = {"file": image_file}
+            data = {"content": full_caption}
+            response = requests.post(self.webhook_url, data=data, files=files)
+
+        if response.status_code == 204:
+            print("✅ 画像送信成功！")
+        else:
+            print(f"⚠️ エラー: {response.status_code}")
+            print(response.text)
+
 
 class Action:
+    @staticmethod
+    def reset():
+        # ipアドレスリセット
+        JumpManager.jump_to_vpn_setting()
+        JumpManager.jump_to_vpn_switch_to_turn_off()
+        pyautogui.press("esc")
+        time.sleep(10)
+
+        # ログインリセット
+        JumpManager.jump_to_ffb_top_page()
+        time.sleep(10)
+        # ... id入力
+        login_manager = LoginManager()
+        account = login_manager.get_current_account()
+        pyautogui.write(account["id"], 1)  # 1sec毎にタイプ
+        pyautogui.press("tab")
+        time.sleep(10)
+        # ... pass入力
+        pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
+        time.sleep(10)
+        # ... ログイン
+        JumpManager.jump_to_vpn_setting()
+        JumpManager.jump_to_vpn_switch_to_turn_on()
+        pyautogui.press("esc")
+        time.sleep(10)
+        JumpManager.jump_to_login_button()
+        time.sleep(5)
+
     @staticmethod
     def home():
         pyautogui.press("home")
@@ -556,7 +736,9 @@ class HandleRecaptcha:
 
 class Macro:
     @staticmethod
-    def collect_material(collect_mode, collect_yoroi, collect_various_kouseki):
+    def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
+        idling_time = 0
+
         while True:
             Action.home()
             if collect_yoroi:
@@ -567,15 +749,30 @@ class Macro:
             for _ in range(loop_num):
                 pyautogui.press("home")
                 time.sleep(0.5)
-                if random.randint(1, 1000) > 995:
-                    rest_time = random.randint(1, 300000) / 1000
-                    print(f"約 {rest_time / 60:.2f} min の休憩に入ります。")
-                    time.sleep(rest_time)
 
-                if collect_mode == "Manomori":
+                # ジャンプフラグを初期化して、このループ内で一度でもジャンプが行われたかどうかを監視する
+                JumpHandler.jump_used = False
+                start_time = time.time()
+                if collect_mode == "manomori":
                     Macro.step_manomori()
-                elif collect_mode == "Saishu":
+                elif collect_mode == "saishu":
                     Macro.step_saishu()
+
+                # step関数内でジャンプが発動していたら休憩の抽選を行う
+                # 発動していないなら、アイドリング時間として加算する。アイドリング時間が一定基準を超えるとリセット発動。
+                if JumpHandler.jump_used:
+                    idling_time = 0
+                    if random.randint(1, 1000) > 995:
+                        rest_time = random.randint(1, 600000) / 1000
+                        print(f"約 {rest_time / 60:.2f} min の休憩に入ります。")
+                        time.sleep(rest_time)
+                        print(f"休憩終了。メインループに戻ります。")
+                else:
+                    time.sleep(1)
+                    idling_time += time.time() - start_time
+
+                if idling_time > 600:
+                    Action.reset()
 
     @staticmethod
     def kamo_gari():
@@ -650,8 +847,10 @@ class ImageRecognizer:
         "is-shuppin": {"filename": "is-shuppin.png", "confidence": 0.8, "region": (384, 144, 1038, 560)},
         "shuppin-done": {"filename": "shuppin-done.png", "confidence": 0.8, "region": (1, 120, 539, 239)},
         "is-champ": {"filename": "is-champ.png", "confidence": 0.8, "region": (5, 122, 1877, 163)},
-        "cloudflare-check-02": {"filename": "cloudflare-check-02.png", "confidence": 0.8, "region": (1, 122, 1082, 885)},
-        "cloudflare-success-02": {"filename": "cloudflare-success-02.png", "confidence": 0.8, "region": (1, 122, 1137, 909)},
+        "cloudflare-check-02": {"filename": "cloudflare-check-02.png", "confidence": 0.8,
+                                "region": (1, 122, 1082, 885)},
+        "cloudflare-success-02": {"filename": "cloudflare-success-02.png", "confidence": 0.8,
+                                  "region": (1, 122, 1137, 909)},
         "is-madatuzukeru": {"filename": "is-madatuzukeru.png", "confidence": 0.8, "region": (1, 121, 872, 899)},
         "go-to-last": {"filename": "last-pulldown.png", "confidence": 0.75, "region": (888, 201, 1006, 718)},
         "in-last": {"filename": "in-last.png", "confidence": 0.8, "region": (1, 112, 1079, 573)},
@@ -665,7 +864,15 @@ class ImageRecognizer:
         "auc": {"filename": "auc.png", "confidence": 0.85, "region": (163, 218, 973, 598)},
         "go-to-shuppin": {"filename": "to-shuppin.png", "confidence": 0.8, "region": (1, 127, 618, 900)},
         "bougu-ya": {"filename": "bougu-ya.png", "confidence": 0.8, "region": (2, 123, 1205, 738)},
-        "is-bougu-ya": {"filename": "is-bougu-ya.png", "confidence": 0.8, "region": (1, 126, 1063, 891)}
+        "is-bougu-ya": {"filename": "is-bougu-ya.png", "confidence": 0.8, "region": (1, 126, 1063, 891)},
+        "ad-close": {"filename": "ad-close.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "vpn-icon-on": {"filename": "vpn-icon-on.png", "confidence": 0.8, "region": (607, 1, 1307, 300)},
+        "vpn-icon-off": {"filename": "vpn-icon-off.png", "confidence": 0.8, "region": (607, 1, 1307, 300)},
+        "vpn-window": {"filename": "vpn-window.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "vpn-on-state": {"filename": "vpn-on-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "vpn-off-state": {"filename": "vpn-off-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (1, 536, 1374, 302)},
+        "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (1, 536, 1374, 302)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
@@ -678,7 +885,7 @@ class ImageRecognizer:
             return None
 
         filename = os.path.join(ImageRecognizer.IMAGE_FOLDER, params["filename"])
-        region = params["region"]
+        region = params["region"]  # (x, y, width, height)
         confidence = params["confidence"]
 
         screenshot = pyautogui.screenshot(region=region)
@@ -697,7 +904,8 @@ class ImageRecognizer:
             return None
 
         h, w = template.shape[:2]
-        return (max_loc[0] + w // 2, max_loc[1] + h // 2)
+        screen_x, screen_y = region[:2]  # モニタ座標のオフセットを取得
+        return (max_loc[0] + w // 2 + screen_x, max_loc[1] + h // 2 + screen_y)
 
     @staticmethod
     def locate_all(key):
@@ -707,7 +915,7 @@ class ImageRecognizer:
             return []
 
         filename = os.path.join(ImageRecognizer.IMAGE_FOLDER, params["filename"])
-        region = params["region"]
+        region = params["region"]  # (x, y, width, height)
         confidence = params["confidence"]
 
         screenshot = pyautogui.screenshot(region=region)
@@ -723,5 +931,5 @@ class ImageRecognizer:
         loc = np.where(result >= confidence)
 
         h, w = template.shape[:2]
-        return [(pt[0] + w // 2, pt[1] + h // 2) for pt in zip(*loc[::-1])]
-
+        screen_x, screen_y = region[:2]  # モニタ座標のオフセットを取得
+        return [(pt[0] + w // 2 + screen_x, pt[1] + h // 2 + screen_y) for pt in zip(*loc[::-1])]
