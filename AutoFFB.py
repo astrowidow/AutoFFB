@@ -12,7 +12,7 @@ import requests
 import cv2
 import numpy as np
 import pyscreeze as pysc
-import PIL as PIL
+import PIL as PIL  # pillowで検索
 
 
 class IPManager:
@@ -413,7 +413,7 @@ class Notifier:
         """
         full_message = self.generate_prefix()
         if message:
-            full_message += "---------------------------------------------\n" + message + "---------------------------------------------\n"
+            full_message += "---------------------------------------------\n" + message + "\n---------------------------------------------\n"
 
         data = {"content": full_message}
         response = requests.post(self.webhook_url, json=data)
