@@ -334,6 +334,7 @@ class LoginManager:
             self.switch_times = []
             self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+            self.current_account = self.get_current_account()
 
     def add_account(self, switch_time, user_id, password):
         """アカウント情報を追加"""
@@ -347,6 +348,14 @@ class LoginManager:
             if t <= now:
                 return self.account_table[t]
         return self.account_table[self.switch_times[-1]]  # 一番遅い時間をデフォルトに
+
+    def check_account_switch(self):
+        new_account = self.get_current_account()
+        if new_account["id"] == self.current_account["id"]:
+            self.current_account = new_account
+            return True
+        else:
+            return False
 
 
 class Notifier:
@@ -369,7 +378,7 @@ class Notifier:
     def generate_prefix():
         login_manager = LoginManager()
         pc_name = login_manager.pc_name
-        user_name = login_manager.get_current_account()
+        user_name = login_manager.current_account["id"]
         prefix = f"🖥 **ホスト名:** {pc_name}\n"
         prefix += f"👤 **ユーザー名:** {user_name}\n"
         return prefix
@@ -428,11 +437,19 @@ class Action:
         time.sleep(10)
         # ... id入力
         login_manager = LoginManager()
-        account = login_manager.get_current_account()
+        account = login_manager.current_account
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(1)
+        pyautogui.press("backspace")
+        time.sleep(1)
         pyautogui.write(account["id"], 1)  # 1sec毎にタイプ
         pyautogui.press("tab")
         time.sleep(10)
         # ... pass入力
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(1)
+        pyautogui.press("backspace")
+        time.sleep(1)
         pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
         time.sleep(10)
         # ... ログイン
@@ -738,8 +755,13 @@ class Macro:
     @staticmethod
     def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
         idling_time = 0
+        Action.reset()
 
         while True:
+            login_manager = LoginManager()
+            if login_manager.check_account_switch():
+                Action.reset()
+                
             Action.home()
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
