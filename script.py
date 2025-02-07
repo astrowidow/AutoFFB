@@ -1,5 +1,8 @@
 from AutoFFB import *
 
+vpn_manager = VpnManager()
+vpn_manager.enable(True)
+
 login_manager = LoginManager()
 login_manager.add_account("04:00", "id", "pass")
 login_manager.add_account("16:00", "id", "pass")

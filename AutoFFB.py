@@ -310,10 +310,14 @@ class JumpManager:
 
     @staticmethod
     def jump_to_vpn_switch_to_turn_on():
-        print("VPNスイッチをONにします。")
-        if ImageRecognizer.locate_center("vpn-invalid"):
-            JumpHandler("vpn-off-state", "vpn-on-state", time_after_confirmation_range=(3049, 5336),
-                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+        vpn_manager = VpnManager()
+        if vpn_manager.use_vpn:
+            print("VPNスイッチをONにします。")
+            if ImageRecognizer.locate_center("vpn-invalid"):
+                JumpHandler("vpn-off-state", "vpn-on-state", time_after_confirmation_range=(3049, 5336),
+                            react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+        else:
+            print("VPNが有効化されていません。VPNMangerクラスを参照して、有効化してください。")
 
     @staticmethod
     def jump_to_vpn_switch_to_turn_off():
@@ -479,6 +483,23 @@ class PenaltyCounter:
                 sys.exit()
 
 
+class VpnManager:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(VpnManager, cls).__new__(cls)
+        return cls._instance  # インスタンスを作るだけ（変数の初期化はしない）
+
+    def __init__(self):
+        if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.use_vpn = False
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+
+    def enable(self, flag=True):
+        self.use_vpn = flag
+
+
 class Action:
     @staticmethod
     def reset(show_message=True):
@@ -515,11 +536,13 @@ class Action:
         pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
         time.sleep(10)
         # ... ログイン
-        JumpManager.jump_to_vpn_setting()
-        JumpManager.jump_to_vpn_switch_to_turn_on()
-        pyautogui.press("esc")
-        time.sleep(10)
-        ip_manager.reset_ip()
+        vpn_manager = VpnManager()
+        if vpn_manager.use_vpn:
+            JumpManager.jump_to_vpn_setting()
+            JumpManager.jump_to_vpn_switch_to_turn_on()
+            pyautogui.press("esc")
+            time.sleep(10)
+            ip_manager.reset_ip()
         JumpManager.jump_to_login_button()
         time.sleep(5)
         while True:
@@ -904,7 +927,7 @@ class Macro:
             notifier = Notifier()
             notifier.send_discord_message("⚠️ bot検知ページに遷移しました。認証突破を試みます。")
             HandleRecaptcha.wait_for_captcha_ready()
-            HandleRecaptcha.capture_screenshot("before")
+            # HandleRecaptcha.capture_screenshot("before")
 
             checks = [
                 ("recaptcha-check", "recaptcha-success"),
@@ -916,9 +939,9 @@ class Macro:
                 if ImageRecognizer.locate_center(check_key):
                     HandleRecaptcha.check_recaptcha(check_key, wait_key)
 
-            HandleRecaptcha.capture_screenshot("after")
+            # HandleRecaptcha.capture_screenshot("after")
             JumpManager.jump_to_madatuzukeru()
-            HandleRecaptcha.capture_screenshot("negirai")
+            # HandleRecaptcha.capture_screenshot("negirai")
             JumpManager.jump_to_status()
             if ImageRecognizer.locate_center("isStatus"):
                 notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
@@ -953,7 +976,7 @@ class ImageRecognizer:
         "recaptcha-check": {"filename": "recaptcha-check.png", "confidence": 0.8, "region": (1, 120, 793, 907)},
         "recaptcha-success": {"filename": "recaptcha-success.png", "confidence": 0.8, "region": (1, 122, 725, 912)},
         "is-auc": {"filename": "is-auction.png", "confidence": 0.8, "region": (1, 217, 549, 314)},
-        "is-shuppin": {"filename": "is-shuppin.png", "confidence": 0.8, "region": (384, 144, 1038, 560)},
+        "is-shuppin": {"filename": "is-shuppin.png", "confidence": 0.8, "region": (384, 144, 1038, 878)},
         "shuppin-done": {"filename": "shuppin-done.png", "confidence": 0.8, "region": (1, 120, 539, 239)},
         "is-champ": {"filename": "is-champ.png", "confidence": 0.8, "region": (5, 122, 1877, 163)},
         "cloudflare-check-02": {"filename": "cloudflare-check-02.png", "confidence": 0.8,
