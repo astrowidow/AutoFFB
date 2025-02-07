@@ -72,6 +72,7 @@ class IPManager:
         elapsed_time = 0
         last_ip = ""
         stable_time = 0
+        notifier = Notifier()
 
         while elapsed_time < max_wait_time:
             current_ip = self.get_public_ip()
@@ -81,10 +82,12 @@ class IPManager:
             elif current_ip == self.initial_ip:
                 if elapsed_time > 0:
                     print("✅ IPアドレスが元に戻りました。通常処理を続行します。")
+                    notifier.send_discord_message("✅ IPアドレスが元に戻りました。通常処理を続行します。")
                     self.log_ip_change(self.initial_ip, self.initial_ip, elapsed_time)
                 return
             else:
                 if current_ip != last_ip:
+                    notifier.send_discord_message("⚠️ IPアドレスの変更が検知されました。IPアドレスが元に戻るか、変化後のIPで安定するのを確認できるまで待機します。")
                     last_ip = current_ip
                     stable_time = 0
                 else:
@@ -92,6 +95,7 @@ class IPManager:
 
                 if stable_time >= target_stable_time:
                     print(f"⏳ 新しいIP {last_ip} をマスターとして採用 (維持時間: {stable_time}秒)")
+                    notifier.send_discord_message(f"✅ 変更後のIPアドレス {last_ip} をマスターとして採用し、通常処理を続行します。")
                     self.log_ip_change(self.initial_ip, last_ip, elapsed_time)
                     self.initial_ip = last_ip  # 新しいIPをマスターにする
                     return
@@ -103,6 +107,8 @@ class IPManager:
             elapsed_time += check_interval
 
         print("⚠️ 最大待機時間を超えました。処理を継続します。")
+        notifier.send_discord_message(
+            "🚨 IPアドレス変更後の待機においてタイムアウトが発生しました。")
 
     def log_ip_change(self, old_ip, new_ip, elapsed_time):
         """IP変更のログをドキュメントフォルダに保存する"""
@@ -152,15 +158,24 @@ class JumpHandler:
             react_error=self.react_error
         )
 
+        notifier = Notifier()
+        if reason == "Timeout":
+            notifier.send_discord_message("🚨 ページ遷移でタイムアウトが発生しました")
+
         if reason == "ErrorInterrupt":
+            notifier.send_discord_message("⚠️ エラーページが表示されました。ステータス画面への遷移を試みます。")
             print(f"エラーが発生したため、ステータスに戻します。 (元の遷移 from:{self.jump_key} to:{self.wait_key})")
-            self.jump_with_confirmation_core(
+            reason_error = self.jump_with_confirmation_core(
                 jump_key="to-status", wait_key="isStatus",
                 time_after_key_down=100,
                 time_after_confirmation=10000,
                 react_keitai=self.react_keitai,
                 react_error=False
             )
+            if reason_error == "PageTransition":
+                notifier.send_discord_message("✅ エラーページからステータス画面へ遷移に成功しました。")
+            else:
+                notifier.send_discord_message("🚨 エラーページからステータス画面へ遷移に失敗しました。。。")
 
         JumpHandler.jump_used = True
 
@@ -425,7 +440,11 @@ class Notifier:
 
 class Action:
     @staticmethod
-    def reset():
+    def reset(show_message=True):
+        notifier = Notifier()
+        if show_message:
+            notifier.send_discord_message("⚠️ リセットシーケンスが開始されました。")
+
         # ipアドレスリセット
         JumpManager.jump_to_vpn_setting()
         JumpManager.jump_to_vpn_switch_to_turn_off()
@@ -459,6 +478,11 @@ class Action:
         time.sleep(10)
         JumpManager.jump_to_login_button()
         time.sleep(5)
+        while True:
+            if ImageRecognizer.locate_center("isStatus"):
+                if show_message:
+                    notifier.send_discord_message("✅ リセットシーケンスが正常に終了し、ステータス画面が表示されました。")
+                break
 
     @staticmethod
     def home():
@@ -754,14 +778,17 @@ class HandleRecaptcha:
 class Macro:
     @staticmethod
     def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
+        notifier = Notifier()
         idling_time = 0
-        Action.reset()
+        Action.reset(False)
 
         while True:
             login_manager = LoginManager()
             if login_manager.check_account_switch():
+                notifier.send_discord_message("⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
                 Action.reset()
-                
+                notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
+
             Action.home()
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
@@ -820,6 +847,8 @@ class Macro:
     @staticmethod
     def hundle_keitai_denwa():
         if ImageRecognizer.locate_center("keitai"):
+            notifier = Notifier()
+            notifier.send_discord_message("⚠️ bot検知ページに遷移しました。認証突破を試みます。")
             HandleRecaptcha.wait_for_captcha_ready()
             HandleRecaptcha.capture_screenshot("before")
 
@@ -837,6 +866,8 @@ class Macro:
             JumpManager.jump_to_madatuzukeru()
             HandleRecaptcha.capture_screenshot("negirai")
             JumpManager.jump_to_status()
+            if ImageRecognizer.locate_center("isStatus"):
+                notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
 
 
 class ImageRecognizer:
