@@ -803,7 +803,8 @@ class HandleRecaptcha:
 
         time_after_confirmation = random.randint(849, 1036)  # 849 + Random(0, 187)
         check_success = False
-        while True:
+        start_time = time.time()
+        while time.time() - start_time < 600:
             location = ImageRecognizer.locate_center(jump_key)
             if location:
                 print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
@@ -821,7 +822,6 @@ class HandleRecaptcha:
                 pyautogui.mouseDown()
                 time.sleep(click_duration)
                 pyautogui.mouseUp()
-                notifier.send_discord_message(f"⚠️ 人間認証チェックを付けました。認証成功するまで無限に待機します。 from:{jump_key} to:{wait_key}")
                 # ... クリック後遠ざかる
                 pointer_moving_duration = random.randint(525, 1242) / 1000
                 target_x = location[0] + random.randint(320, 540)
@@ -833,15 +833,16 @@ class HandleRecaptcha:
                     time.sleep(check_interval)
                     if ImageRecognizer.locate_center(wait_key):
                         check_success = True
-                        notifier.send_discord_message(f"️✅ 人間認証に成功しました。")
                         break
                     elif ImageRecognizer.locate_center(jump_key):
-                        notifier.send_discord_message(f"⚠️ 人間認証チェックを付けましたが、認証に失敗しました。再度チェックを付けて認証を試みます。")
                         wait_before_check = random.randint(543, 10045)
                         time.sleep(wait_before_check / 1000)
                         break
                 if check_success:
                     break
+        if not check_success:
+            notifier.send_discord_message("🚨 一定時間かけても人間認証を突破できませんでした。安全のため、プログラムを終了します。")
+            sys.exit()
         time.sleep(time_after_confirmation / 1000)
 
     @staticmethod
