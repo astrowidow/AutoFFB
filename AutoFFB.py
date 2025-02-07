@@ -807,15 +807,15 @@ class HandleRecaptcha:
         while time.time() - start_time < 600:
             location = ImageRecognizer.locate_center(jump_key)
             if location:
-                print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
                 # ip_manager = IPManager()
                 # ip_manager.wait_for_ip_recovery()
 
                 # 人間っぽい動きにするために細かく制御
                 # ... 指定座標までマウスを移動させる
-                pointer_moving_duration = random.randint(525, 1242) / 1000
+                pointer_moving_duration = random.randint(0, 145) / 1000
                 target_x = location[0] + random.randint(-5, 5)
                 target_y = location[1] + random.randint(-5, 5)
+                print(f"id: {jump_key}, x: {target_x}, y: {target_y}")
                 pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
                 # ... クリック
                 click_duration = random.randint(32, 282) / 1000
@@ -823,9 +823,9 @@ class HandleRecaptcha:
                 time.sleep(click_duration)
                 pyautogui.mouseUp()
                 # ... クリック後遠ざかる
-                pointer_moving_duration = random.randint(525, 1242) / 1000
-                target_x = location[0] + random.randint(320, 540)
-                target_y = location[1] + random.randint(220, 340)
+                pointer_moving_duration = random.randint(25, 1242) / 1000
+                target_x = location[0] + random.randint(0, 540)
+                target_y = location[1] + random.randint(0, 340)
                 pyautogui.moveTo(target_x, target_y, duration=pointer_moving_duration)
 
                 check_interval = 0.5  # sec
@@ -835,7 +835,7 @@ class HandleRecaptcha:
                         check_success = True
                         break
                     elif ImageRecognizer.locate_center(jump_key):
-                        wait_before_check = random.randint(543, 10045)
+                        wait_before_check = random.randint(43, 10045)
                         time.sleep(wait_before_check / 1000)
                         break
                 if check_success:
@@ -887,9 +887,20 @@ class Macro:
         notifier = Notifier()
         idling_time = 0
 
-        notifier.send_discord_message("⚠️ FFBオート周回マクロが開始されました。ログインシーケンスを開始します。")
-        Action.reset(False)
-        notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
+        if ImageRecognizer.locate_center("isStatus"):
+            notifier.send_discord_message("✅ FFBオート周回マクロが開始されました。オート周回を開始します。")
+            vpn_manager = VpnManager()
+            if vpn_manager.use_vpn:
+                JumpManager.jump_to_vpn_setting()
+                JumpManager.jump_to_vpn_switch_to_turn_on()
+                pyautogui.press("esc")
+                time.sleep(10)
+                ip_manager = IPManager()
+                ip_manager.reset_ip()
+        else:
+            notifier.send_discord_message("⚠️ FFBオート周回マクロが開始されました。ログインシーケンスを開始します。")
+            Action.reset(False)
+            notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
 
         while True:
             login_manager = LoginManager()
