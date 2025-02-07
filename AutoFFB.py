@@ -1,4 +1,5 @@
 import os
+import sys
 import time
 import datetime
 import random
@@ -373,7 +374,7 @@ class LoginManager:
 
     def check_account_switch(self):
         new_account = self.get_current_account()
-        if new_account["id"] == self.current_account["id"]:
+        if new_account["id"] != self.current_account["id"]:
             self.current_account = new_account
             return True
         else:
@@ -443,6 +444,38 @@ class Notifier:
         else:
             print(f"⚠️ エラー: {response.status_code}")
             print(response.text)
+
+
+class PenaltyCounter:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(PenaltyCounter, cls).__new__(cls)
+        return cls._instance  # インスタンスを作るだけ（変数の初期化はしない）
+
+    def __init__(self):
+        if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.penalty_count = 0
+            self.last_penalty_time = time.time()
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+
+    def check_penalty(self):
+        if ImageRecognizer.locate_center("penalty"):
+            if time.time() - self.last_penalty_time > 10800:
+                self.penalty_count = 1
+            else:
+                self.penalty_count += 1
+            self.last_penalty_time = time.time()
+
+            notifier = Notifier()
+            if self.penalty_count > 5:
+                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、3時間以内に連鎖した警告数は {self.penalty_count}回です。")
+                time.sleep(30)
+                Action.reset()
+            else:
+                notifier.send_discord_message(f"🚨 3時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。安全のため、プログラムを停止します。")
+                sys.exit()
 
 
 class Action:
@@ -790,7 +823,10 @@ class Macro:
     def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
         notifier = Notifier()
         idling_time = 0
+
+        notifier.send_discord_message("⚠️ FFBオート周回マクロが開始されました。ログインシーケンスを開始します。")
         Action.reset(False)
+        notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
 
         while True:
             login_manager = LoginManager()
@@ -816,6 +852,10 @@ class Macro:
                     Macro.step_manomori()
                 elif collect_mode == "saishu":
                     Macro.step_saishu()
+
+                # stepのジャンプによってペナルティ警告ページに飛ばされていないかチェック
+                penalty_counter = PenaltyCounter()
+                penalty_counter.check_penalty()
 
                 # step関数内でジャンプが発動していたら休憩の抽選を行う
                 # 発動していないなら、アイドリング時間として加算する。アイドリング時間が一定基準を超えるとリセット発動。
@@ -846,6 +886,7 @@ class Macro:
         Action.go_to_next_manomori()
         Action.go_to_champ()
         Macro.hundle_keitai_denwa()
+
 
     @staticmethod
     def step_saishu():
@@ -878,6 +919,8 @@ class Macro:
             JumpManager.jump_to_status()
             if ImageRecognizer.locate_center("isStatus"):
                 notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
+            else:
+                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
 
 
 class ImageRecognizer:
@@ -935,8 +978,9 @@ class ImageRecognizer:
         "vpn-on-state": {"filename": "vpn-on-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
         "vpn-off-state": {"filename": "vpn-off-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
         "vpn-invalid": {"filename": "vpn-invalid.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
-        "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (1, 1, 1905, 229)},
-        "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
+        "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (516, 1, 1905, 229)},
+        "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (516, 1, 1905, 502)},
+        "penalty": {"filename": "penalty.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
