@@ -10,6 +10,8 @@ import pyautogui
 import requests
 import cv2
 import numpy as np
+import pyscreeze as pysc
+import PIL as PIL
 
 
 class IPManager:
@@ -31,6 +33,9 @@ class IPManager:
                 print(f"✅ 初期VPN IP: {self.initial_ip}")
             else:
                 print("⚠️ 初回のIPアドレス取得に失敗しました。インターネット接続を確認してください。")
+
+    def reset_ip(self):
+        self.initial_ip = self.get_public_ip()
 
     @staticmethod
     def get_log_directory():
@@ -305,7 +310,7 @@ class JumpManager:
     @staticmethod
     def jump_to_vpn_switch_to_turn_on():
         print("VPNスイッチをONにします。")
-        if ImageRecognizer.locate_center("vpn-off-state"):
+        if ImageRecognizer.locate_center("vpn-invalid"):
             JumpHandler("vpn-off-state", "vpn-on-state", time_after_confirmation_range=(3049, 5336),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
@@ -313,11 +318,12 @@ class JumpManager:
     def jump_to_vpn_switch_to_turn_off():
         print("VPNスイッチをOFFにします。")
         if ImageRecognizer.locate_center("vpn-on-state"):
-            JumpHandler("vpn-on-state", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
-                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
-            # if ImageRecognizer.locate_center("ad-close"):
-            #     JumpHandler("ad-close", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
-            #                 react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+            if not ImageRecognizer.locate_center("vpn-invalid"):
+                JumpHandler("vpn-on-state", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
+                            react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+                # if ImageRecognizer.locate_center("ad-close"):
+                #     JumpHandler("ad-close", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
+                #                 react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
     @staticmethod
     def jump_to_ffb_top_page():
@@ -349,12 +355,13 @@ class LoginManager:
             self.switch_times = []
             self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
-            self.current_account = self.get_current_account()
+            self.current_account = {}
 
     def add_account(self, switch_time, user_id, password):
         """アカウント情報を追加"""
         self.account_table[switch_time] = {"id": user_id, "password": password}
         self.switch_times = sorted(self.account_table.keys())
+        self.current_account = self.get_current_account()
 
     def get_current_account(self):
         """現在の時間に対応するアカウント情報を取得（24時間ループ考慮）"""
@@ -450,6 +457,8 @@ class Action:
         JumpManager.jump_to_vpn_switch_to_turn_off()
         pyautogui.press("esc")
         time.sleep(10)
+        ip_manager = IPManager()
+        ip_manager.reset_ip()
 
         # ログインリセット
         JumpManager.jump_to_ffb_top_page()
@@ -476,6 +485,7 @@ class Action:
         JumpManager.jump_to_vpn_switch_to_turn_on()
         pyautogui.press("esc")
         time.sleep(10)
+        ip_manager.reset_ip()
         JumpManager.jump_to_login_button()
         time.sleep(5)
         while True:
@@ -924,8 +934,9 @@ class ImageRecognizer:
         "vpn-window": {"filename": "vpn-window.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
         "vpn-on-state": {"filename": "vpn-on-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
         "vpn-off-state": {"filename": "vpn-off-state.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
-        "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (1, 536, 1374, 302)},
-        "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (1, 536, 1374, 302)},
+        "vpn-invalid": {"filename": "vpn-invalid.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (1, 1, 1905, 229)},
+        "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス

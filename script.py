@@ -5,7 +5,7 @@ login_manager.add_account("04:00", "id", "pass")
 login_manager.add_account("16:00", "id", "pass")
 
 notifier = Notifier()
-notifier.add_webhook()
+notifier.add_webhook("hook url")
 
 # 鎧集めなし、各種鉱石集め
 Macro.collect_material("manomori", collect_yoroi=False, collect_various_kouseki=True)
