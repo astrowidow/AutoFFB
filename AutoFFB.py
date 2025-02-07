@@ -476,7 +476,7 @@ class PenaltyCounter:
             self.last_penalty_time = time.time()
 
             notifier = Notifier()
-            if self.penalty_count > 5:
+            if self.penalty_count <= 5:
                 notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、{dangerous_interval}時間以内に連鎖した警告数は {self.penalty_count}回です。")
                 time.sleep(30)
                 Action.reset()
