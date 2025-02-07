@@ -339,7 +339,7 @@ class JumpManager:
     def jump_to_login_button():
         if ImageRecognizer.locate_center("ffb-login"):
             JumpHandler("ffb-login", "isStatus", time_after_confirmation_range=(3049, 5336),
-                        react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+                        react_keitai=True, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
 
 class LoginManager:
@@ -526,6 +526,8 @@ class Action:
             if ImageRecognizer.locate_center("isStatus"):
                 if show_message:
                     notifier.send_discord_message("✅ リセットシーケンスが正常に終了し、ステータス画面が表示されました。")
+                break
+            if ImageRecognizer.locate_center("keitai"):
                 break
 
     @staticmethod
