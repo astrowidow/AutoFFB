@@ -208,7 +208,7 @@ class JumpHandler:
 
             final_wait_time = time_after_confirmation
             if enable_adaptive_wait:
-                adaptive_wait_time = int(elapsed_time * 2000)
+                adaptive_wait_time = int(elapsed_time * 1200)
                 final_wait_time = max(time_after_confirmation, adaptive_wait_time)
                 print(
                     f"遷移後待機時間: {final_wait_time} msec (基準: {time_after_confirmation} msec, 応答ベース: {adaptive_wait_time} msec)")
@@ -292,7 +292,7 @@ class JumpManager:
         if ImageRecognizer.locate_center(wait_key):
             time_after_confirmation = (18549, 26636)
         else:
-            time_after_confirmation = (2049, 2336)
+            time_after_confirmation = (2149, 2336)
         JumpHandler(jump_key, wait_key, time_after_confirmation_range=time_after_confirmation).jump_with_confirmation()
 
     @staticmethod
@@ -799,6 +799,9 @@ class Action:
 
 
 class HandleRecaptcha:
+    DISPLAY_WIDTH = 1920
+    DISPLAY_HEIGHT = 1080
+
     @staticmethod
     def check_recaptcha(jump_key, wait_key):
         notifier = Notifier()
@@ -806,7 +809,8 @@ class HandleRecaptcha:
         time_after_confirmation = random.randint(349, 836)  # 849 + Random(0, 187)
         check_success = False
         start_time = time.time()
-        while time.time() - start_time < 600:
+        challenge_count = 0
+        while challenge_count < 30:
             location = ImageRecognizer.locate_center(jump_key)
             if location:
                 # ip_manager = IPManager()
@@ -814,11 +818,11 @@ class HandleRecaptcha:
 
                 # 人間っぽい動きにするために細かく制御
                 # ... 指定座標までマウスを移動させる
-                pointer_moving_duration = random.randint(1188, 2105) / 1000
+                pointer_moving_duration = random.randint(1740, 3005) / 1000
                 start_x = random.randint(400, 1800)
                 start_y = random.randint(500, 800)
-                target_x = location[0] + random.randint(-5, 5)
-                target_y = location[1] + random.randint(-5, 5)
+                target_x = location[0] + random.randint(-6, 6)
+                target_y = location[1] + random.randint(-6, 6)
                 print(f"id: {jump_key}, x: {target_x}, y: {target_y}")
                 HandleRecaptcha.human_like_mouse_move((start_x, start_y), (target_x, target_y), pointer_moving_duration)
                 # ... クリック
@@ -827,23 +831,28 @@ class HandleRecaptcha:
                 time.sleep(click_duration)
                 pyautogui.mouseUp()
                 # ... クリック後遠ざかる
-                pointer_moving_duration = random.randint(1530, 2242) / 1000
+                pointer_moving_duration = random.randint(1030, 1542) / 1000
                 start_x = target_x
                 start_y = target_y
                 target_x = location[0] + random.randint(540, 840)
                 target_y = location[1] + random.randint(340, 540)
                 HandleRecaptcha.human_like_mouse_move((start_x, start_y), (target_x, target_y), pointer_moving_duration)
 
-                check_interval = 0.5  # sec
+                check_interval = 0.1  # sec
                 while True:
-                    time.sleep(check_interval)
                     if ImageRecognizer.locate_center(wait_key):
                         check_success = True
                         break
                     elif ImageRecognizer.locate_center(jump_key):
-                        # wait_before_check = random.randint(43, 10045)
-                        # time.sleep(wait_before_check / 1000)
+                        challenge_count += 1
+                        randint = random.randint(1,100)
+                        if randint > 90:
+                            randint = random.randint(300000, 600000)
+                            sleepsec = randint/1000
+                            print(f"{sleepsec}秒休憩")
+                            time.sleep(sleepsec)
                         break
+                    time.sleep(check_interval)
                 if check_success:
                     break
         if not check_success:
@@ -887,33 +896,45 @@ class HandleRecaptcha:
         print(f"📸 スクリーンショットを保存しました: {file_path}")
 
     @classmethod
-    def human_like_mouse_move(cls, start, end, duration=1.5):
+    def generate_path(cls, start, end):
         x1, y1 = start
         x2, y2 = end
-        num_segments = random.randint(3, 6)  # 分割数をランダム化
-        total_time = duration
+        num_segments = max(2, random.randint(3, 6))  # 分割数を最低2に設定
         points = [start]
+        segment_durations = []  # 各区間の待機時間を格納
 
         prev_x, prev_y = x1, y1
-
         for _ in range(num_segments - 1):
-            mid_x = np.interp(random.random(), [0, 1], [prev_x, x2])
-            mid_y = np.interp(random.random(), [0, 1], [prev_y, y2])
-            offset_x = random.uniform(-(abs(prev_x - x2) * 0.5), abs(prev_x - x2) * 0.5)
-            offset_y = random.uniform(-(abs(prev_y - y2) * 0.5), abs(prev_y - y2) * 0.5)
-            new_x = int(mid_x + offset_x)
-            new_y = int(mid_y + offset_y)
+            while True:
+                mid_x = np.interp(random.random(), [0, 1], [prev_x, x2])
+                mid_y = np.interp(random.random(), [0, 1], [prev_y, y2])
+                offset_x = random.uniform(-abs(prev_x - x2) * 0.5, abs(prev_x - x2) * 0.5)
+                offset_y = random.uniform(-abs(prev_y - y2) * 0.5, abs(prev_y - y2) * 0.5)
+                new_x = int(mid_x + offset_x)
+                new_y = int(mid_y + offset_y)
+
+                # 画面外にならないようにチェック
+                if 0 <= new_x <= cls.DISPLAY_WIDTH and 0 <= new_y <= cls.DISPLAY_HEIGHT:
+                    break
+
             points.append((new_x, new_y))
             prev_x, prev_y = new_x, new_y
+            segment_durations.append(random.uniform(0.05, 0.2))  # 各頂点でのスリープ時間を設定
         points.append(end)
+        segment_durations.append(0)  # 最後の目標地点では停止しない
 
         path = []
         for i in range(len(points) - 1):
             p1, p2 = points[i], points[i + 1]
-            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
-            mid_x = (p1[0] + p2[0]) / 2 + random.uniform(-abs(dx) * 0.6, abs(dx) * 0.6)
-            mid_y = (p1[1] + p2[1]) / 2 + random.uniform(-abs(dy) * 0.6, abs(dy) * 0.6)
-            p_mid = (int(mid_x), int(mid_y))
+            while True:
+                dx, dy = p2[0] - p1[0], p2[1] - p1[1]
+                mid_x = (p1[0] + p2[0]) / 2 + random.uniform(-abs(dx) * 0.8, abs(dx) * 0.8)
+                mid_y = (p1[1] + p2[1]) / 2 + random.uniform(-abs(dy) * 0.8, abs(dy) * 0.8)
+                p_mid = (int(mid_x), int(mid_y))
+
+                # 画面外にならないようにチェック
+                if 0 <= p_mid[0] <= cls.DISPLAY_WIDTH and 0 <= p_mid[1] <= cls.DISPLAY_HEIGHT:
+                    break
 
             def bezier_curve(t, p0, p1, p2):
                 return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
@@ -924,60 +945,40 @@ class HandleRecaptcha:
             for t in t_vals:
                 path.append(bezier_curve(t, p1, p_mid, p2))
 
-        path = np.array(path)
-        total_steps = len(path)
-        step_duration = total_time / total_steps  # 各ステップの時間を調整
+        return np.array(path), points, segment_durations
 
-        for (x, y) in path:
+    @classmethod
+    def human_like_mouse_move(cls, start, end, duration=1.5):
+        path, points, segment_durations = cls.generate_path(start, end)
+        total_segment_pause = sum(segment_durations)
+        available_move_time = duration - total_segment_pause  # 実際の移動に使える時間
+        total_steps = len(path)
+        min_time_step = 0.05
+        step_duration = available_move_time / total_steps
+
+        if step_duration < min_time_step:
+            skip_factor = int(np.ceil(min_time_step / step_duration))
+            path = path[::skip_factor]
+            total_steps = len(path)
+            step_duration = available_move_time / total_steps
+
+        step_idx = 0
+        for i, (x, y) in enumerate(path):
             pyautogui.moveTo(int(x), int(y), duration=step_duration)
-            if random.random() < 0.15:
-                time.sleep(random.uniform(0.5 * step_duration, 1.5 * step_duration))
-        pyautogui.moveTo(x2, y2, duration=0.05)
+            if i > 0 and i % max(1, len(path) // len(segment_durations)) == 0:
+                if step_idx < len(segment_durations):
+                    time.sleep(segment_durations[step_idx])  # 各頂点で停止
+                    step_idx += 1
+        pyautogui.moveTo(end[0], end[1], duration=0.05)
 
     @classmethod
     def visualize_path(cls, start, end, duration=1.5):
-        # テスト用
-        x1, y1 = start
-        x2, y2 = end
-        num_segments = random.randint(3, 6)
-        points = [start]
-
-        prev_x, prev_y = x1, y1
-
-        for _ in range(num_segments - 1):
-            mid_x = np.interp(random.random(), [0, 1], [prev_x, x2])
-            mid_y = np.interp(random.random(), [0, 1], [prev_y, y2])
-            offset_x = random.uniform(-(abs(prev_x - x2) * 0.5), abs(prev_x - x2) * 0.5)
-            offset_y = random.uniform(-(abs(prev_y - y2) * 0.5), abs(prev_y - y2) * 0.5)
-            new_x = int(mid_x + offset_x)
-            new_y = int(mid_y + offset_y)
-            points.append((new_x, new_y))
-            prev_x, prev_y = new_x, new_y
-        points.append(end)
-
-        path = []
-        for i in range(len(points) - 1):
-            p1, p2 = points[i], points[i + 1]
-            dx, dy = p2[0] - p1[0], p2[1] - p1[1]
-            mid_x = (p1[0] + p2[0]) / 2 + random.uniform(-abs(dx) * 0.2, abs(dx) * 0.2)
-            mid_y = (p1[1] + p2[1]) / 2 + random.uniform(-abs(dy) * 0.2, abs(dy) * 0.2)
-            p_mid = (int(mid_x), int(mid_y))
-
-            def bezier_curve(t, p0, p1, p2):
-                return (1 - t) ** 2 * np.array(p0) + 2 * (1 - t) * t * np.array(p1) + t ** 2 * np.array(p2)
-
-            t_vals = np.linspace(0, 1, num=30)
-            t_vals = t_vals ** 2 / (t_vals ** 2 + (1 - t_vals) ** 2)  # 加減速を模擬
-
-            for t in t_vals:
-                path.append(bezier_curve(t, p1, p_mid, p2))
-
-        path = np.array(path)
+        path, points, _ = cls.generate_path(start, end)
         plt.figure(figsize=(6, 6))
         plt.plot(path[:, 0], path[:, 1], marker='o', linestyle='-', color='b', label='Mouse Path')
         plt.scatter(*zip(*points), color='r', label='Control Points')
         plt.legend()
-        plt.title("Simulated Human-like Mouse Movement with Timing Adjustment")
+        plt.title("Simulated Human-like Mouse Movement")
         plt.gca().invert_yaxis()
         plt.show()
 
