@@ -819,6 +819,37 @@ class HandleRecaptcha:
     DISPLAY_HEIGHT = 1080
 
     @staticmethod
+    def check_recaptcha2(jump_key, wait_key):
+        notifier = Notifier()
+
+        time_after_confirmation = random.randint(349, 836)  # 849 + Random(0, 187)
+        check_success = False
+        challenge_count = 0
+        while challenge_count < 30:
+            location = ImageRecognizer.locate_center(jump_key)
+            if location:
+                # call key to key
+                pyautogui.keyDown("pageup")
+                time.sleep(0.2)
+                pyautogui.keyUp("pageup")
+
+                # wait success
+                start_time = time.time()
+                check_interval = 0.1  # sec
+                while time.time() - start_time < 600:
+                    if ImageRecognizer.locate_center(wait_key):
+                        check_success = True
+                        break
+                    time.sleep(check_interval)
+                if check_success:
+                    break
+                else:
+                    notifier.send_discord_message(
+                        "🚨 一定時間かけても人間認証を突破できませんでした。安全のため、プログラムを終了します。")
+                    sys.exit()
+        time.sleep(time_after_confirmation / 1000)
+
+    @staticmethod
     def check_recaptcha(jump_key, wait_key):
         notifier = Notifier()
 
@@ -1006,6 +1037,7 @@ class Macro:
         vpn_manager = VpnManager()
         idling_time = 0
 
+        # 初期画面がステータス画面かどうかでイニシャライズ方法を変える。
         if ImageRecognizer.locate_center("isStatus"):
             notifier.send_discord_message("✅ FFBオート周回マクロが開始されました。オート周回を開始します。")
             if vpn_manager.use_vpn:
@@ -1020,6 +1052,7 @@ class Macro:
             Action.reset(False)
             notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
 
+        # ここから周回開始
         while True:
             login_manager = LoginManager()
             if login_manager.check_account_switch():
@@ -1106,7 +1139,7 @@ class Macro:
 
             for check_key, wait_key in checks:
                 if ImageRecognizer.locate_center(check_key):
-                    HandleRecaptcha.check_recaptcha(check_key, wait_key)
+                    HandleRecaptcha.check_recaptcha2(check_key, wait_key)
 
             # HandleRecaptcha.capture_screenshot("after")
             JumpManager.jump_to_madatuzukeru()
