@@ -509,10 +509,12 @@ class VpnManager:
     def __init__(self):
         if not hasattr(self, "initialized"):  # 初回だけ初期化
             self.use_vpn = False
+            self.user_setting = False
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def enable(self, flag=True):
         self.use_vpn = flag
+        self.user_setting = flag
 
 
 class Action:
@@ -817,6 +819,29 @@ class Action:
 class HandleRecaptcha:
     DISPLAY_WIDTH = 1920
     DISPLAY_HEIGHT = 1080
+
+    @staticmethod
+    def login_another_window():
+        # ✅ Winキーを押してスタートメニューを開く
+        pyautogui.hotkey("win")
+        time.sleep(2)  # スタートメニューが開くのを待機
+
+        # ✅ "chrome" を入力
+        pyautogui.write("chrome", interval=0.2)
+        time.sleep(2)  # 入力が完了するのを待つ
+
+        # ✅ Enterキーを押してChromeを開く
+        pyautogui.press("enter")
+        time.sleep(3)  # Chromeの起動を待つ（環境によって調整）
+
+        # VPNは切っておく。
+        vpn_manager = VpnManager()
+        vpn_manager.use_vpn = False
+        Action.reset(show_message=False)
+        if ImageRecognizer.locate_center("isStatus"):
+            notifier = Notifier()
+            notifier.send_discord_message(
+                "🚨 新ウィンドウウインドウ立ち上げてステータス画面遷移無事完了（確認できたらこのメッセージ消す！）")
 
     @staticmethod
     def check_recaptcha2(jump_key, wait_key):
@@ -1128,6 +1153,13 @@ class Macro:
         if ImageRecognizer.locate_center("keitai"):
             notifier = Notifier()
             notifier.send_discord_message("⚠️ bot検知ページに遷移しました。認証突破を試みます。")
+
+            # まずは怪しくないChromeセッションを立ち上げる
+            HandleRecaptcha.login_another_window()
+            if not ImageRecognizer.locate_center("keitai"):
+                notifier.send_discord_message("🚨 bot検知解決中に想定外の事が起きました。新しいウィンドウでの再ログイン時に携帯電話画面になりませんでした。プログラムを終了します。")
+                sys.exit()
+
             HandleRecaptcha.wait_for_captcha_ready()
             # HandleRecaptcha.capture_screenshot("before")
 
@@ -1139,16 +1171,28 @@ class Macro:
 
             for check_key, wait_key in checks:
                 if ImageRecognizer.locate_center(check_key):
-                    HandleRecaptcha.check_recaptcha2(check_key, wait_key)
+                    HandleRecaptcha.check_recaptcha(check_key, wait_key)
 
             # HandleRecaptcha.capture_screenshot("after")
             JumpManager.jump_to_madatuzukeru()
             # HandleRecaptcha.capture_screenshot("negirai")
             JumpManager.jump_to_status()
             if ImageRecognizer.locate_center("isStatus"):
-                notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
+                # 立ち上がっているはずのChrome新Windowを閉じる
+                pyautogui.hotkey("alt", "f4")
+                time.sleep(2)
+                # debugモードクロムに対してアカウントログインし直して認証突破になるはず。
+                vpn_manager = VpnManager()
+                vpn_manager.use_vpn = vpn_manager.user_setting
+                Action.reset()
+                if ImageRecognizer.locate_center("isStatus"):
+                    notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
+                else:
+                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。プログラムを終了します。")
+                    sys.exit()
             else:
-                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
+                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。プログラムを終了します。")
+                sys.exit()
 
 
 class ImageRecognizer:
