@@ -15,6 +15,7 @@ import pyscreeze as pysc
 import PIL as PIL  # pillowで検索
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
+import setproctitle
 
 
 class IPManager:
@@ -54,13 +55,24 @@ class IPManager:
         try:
             options = Options()
             options.debugger_address = "127.0.0.1:9222"  # 既存のChromeセッションに接続
+            options.add_argument("--disable-blink-features=AutomationControlled")  # 自動操作検出回避
 
-            # ✅ Pythonスクリプトと同じフォルダにある chromedriver を指定
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            driver_path = os.path.join(script_dir, "chromedriver.exe" if os.name == "nt" else "chromedriver")
+            # ✅ ChromeDriver のパスを取得（pyinstaller に対応）
+            def get_chromedriver_path():
+                if getattr(sys, 'frozen', False):
+                    return os.path.join(sys._MEIPASS, "chromedriver.exe")
+                else:
+                    script_dir = os.path.dirname(os.path.abspath(__file__))
+                    return os.path.join(script_dir, "chromedriver.exe" if os.name == "nt" else "chromedriver")
+            driver_path = get_chromedriver_path()
 
             service = Service(executable_path=driver_path)
             driver = webdriver.Chrome(service=service, options=options)
+
+            # ✅ navigator.webdriver の隠蔽
+            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+                "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
+            })
 
             # ✅ C# の `Navigate().GoToUrl()` と同じ動作
             driver.execute_script("window.location = 'https://api64.ipify.org';")
@@ -196,6 +208,7 @@ class JumpHandler:
 
             target_x = location[0] + offset_x
             target_y = location[1] + offset_y
+            pyautogui.moveTo(target_x, target_y, 0.2)
             pyautogui.click(target_x, target_y, duration=time_after_key_down / 1000)
 
             print(f"ページ遷移待ち処理開始 from:{jump_key} to:{wait_key}")
@@ -672,6 +685,7 @@ class Action:
                                 click_ok = False
                                 break
                         if click_ok:
+                            pyautogui.moveTo(result_sell[0], result_sell[1], 0.2)
                             pyautogui.click(result_sell[0], result_sell[1])
                             time.sleep(3)
                             JumpManager.jump_to_bougu()
@@ -722,6 +736,7 @@ class Action:
                                 break
 
                     if click_ok:
+                        pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
                         pyautogui.click(result_radio[0], result_radio[1], duration=0.5)
                         time.sleep(2)
                         pyautogui.press("tab")
@@ -773,6 +788,7 @@ class Action:
                                 break
 
                     if click_ok:
+                        pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
                         pyautogui.click(result_radio[0], result_radio[1])
                         time.sleep(2)
                         pyautogui.press("tab")
