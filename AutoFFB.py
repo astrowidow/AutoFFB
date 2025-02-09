@@ -834,8 +834,8 @@ class HandleRecaptcha:
 
     @staticmethod
     def login_another_window():
-        # ✅ Winキーを押してスタートメニューを開く
-        pyautogui.hotkey("win")
+        # ✅ Winキーと同じ効果があるショートカット。レジストリでWin無効のマシンもあるので。
+        pyautogui.hotkey("ctrl", "esc")
         time.sleep(2)  # スタートメニューが開くのを待機
 
         # ✅ "chrome" を入力
