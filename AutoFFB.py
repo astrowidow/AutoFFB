@@ -1087,6 +1087,13 @@ class Macro:
                 time.sleep(10)
                 ip_manager = IPManager()
                 ip_manager.reset_ip()
+            else:
+                JumpManager.jump_to_vpn_setting()
+                JumpManager.jump_to_vpn_switch_to_turn_off()
+                pyautogui.press("esc")
+                time.sleep(10)
+                ip_manager = IPManager()
+                ip_manager.reset_ip()
         else:
             notifier.send_discord_message("⚠️ FFBオート周回マクロが開始されました。ログインシーケンスを開始します。")
             Action.reset(False)
