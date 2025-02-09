@@ -16,6 +16,7 @@ import PIL as PIL  # pillowで検索
 from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import setproctitle
+import atexit
 
 
 class IPManager:
@@ -505,7 +506,7 @@ class PenaltyCounter:
                 time.sleep(30)
                 Action.reset()
             else:
-                notifier.send_discord_message(f"🚨 {dangerous_interval}時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。安全のため、プログラムを停止します。")
+                notifier.send_discord_message(f"🚨 {dangerous_interval}時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。")
                 sys.exit()
 
 
@@ -877,7 +878,7 @@ class HandleRecaptcha:
                     break
                 else:
                     notifier.send_discord_message(
-                        "🚨 一定時間かけても人間認証を突破できませんでした。安全のため、プログラムを終了します。")
+                        "🚨 一定時間かけても人間認証を突破できませんでした。")
                     sys.exit()
         time.sleep(time_after_confirmation / 1000)
 
@@ -935,7 +936,7 @@ class HandleRecaptcha:
                 if check_success:
                     break
         if not check_success:
-            notifier.send_discord_message("🚨 一定時間かけても人間認証を突破できませんでした。安全のため、プログラムを終了します。")
+            notifier.send_discord_message("🚨 一定時間かけても人間認証を突破できませんでした。")
             sys.exit()
         time.sleep(time_after_confirmation / 1000)
 
@@ -1064,7 +1065,14 @@ class HandleRecaptcha:
 
 class Macro:
     @staticmethod
+    def on_exit():
+        notifier = Notifier()
+        notifier.enable_message = True
+        notifier.send_discord_message("🚨 プログラムを終了します。手動で原因調査と復帰を試みてください。")
+
+    @staticmethod
     def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
+        atexit.register(Macro.on_exit)
         notifier = Notifier()
         vpn_manager = VpnManager()
         idling_time = 0
@@ -1168,7 +1176,7 @@ class Macro:
             # まずは怪しくないChromeセッションを立ち上げる
             HandleRecaptcha.login_another_window()
             if not ImageRecognizer.locate_center("keitai"):
-                notifier.send_discord_message("🚨 bot検知解決中に想定外の事が起きました。新しいウィンドウでの再ログイン時に携帯電話画面になりませんでした。プログラムを終了します。")
+                notifier.send_discord_message("🚨 bot検知解決中に想定外の事が起きました。新しいウィンドウでの再ログイン時に携帯電話画面になりませんでした。")
                 sys.exit()
 
             HandleRecaptcha.wait_for_captcha_ready()
@@ -1202,10 +1210,10 @@ class Macro:
                 if ImageRecognizer.locate_center("isStatus"):
                     notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
-                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。プログラムを終了します。")
+                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
                     sys.exit()
             else:
-                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。プログラムを終了します。")
+                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
                 sys.exit()
 
 
