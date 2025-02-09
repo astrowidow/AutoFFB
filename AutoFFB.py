@@ -411,6 +411,9 @@ class Notifier:
     def __init__(self):
         if not hasattr(self, "initialized"):  # 初回だけ初期化
             self.webhook_url = ""
+            self.enable_message = True
+            self.ok_post_interval = 3*60*60  # 3時間
+            self.last_post_time = time.time()
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def add_webhook(self, webhook_url):
@@ -430,18 +433,20 @@ class Notifier:
         Discordにテキストメッセージを送信する関数
         :param message: 送信するテキスト
         """
-        full_message = self.generate_prefix()
-        if message:
-            full_message += "---------------------------------------------\n" + message + "\n---------------------------------------------\n"
+        if self.enable_message:
+            full_message = self.generate_prefix()
+            if message:
+                full_message += "---------------------------------------------\n" + message + "\n---------------------------------------------\n"
 
-        data = {"content": full_message}
-        response = requests.post(self.webhook_url, json=data)
+            data = {"content": full_message}
+            response = requests.post(self.webhook_url, json=data)
 
-        if response.status_code == 204:
-            print("✅ discordメッセージ送信成功！")
-        else:
-            print(f"⚠️ discordメッセージ送信エラー: {response.status_code}")
-            print(response.text)
+            if response.status_code == 204:
+                print("✅ discordメッセージ送信成功！")
+            else:
+                print(f"⚠️ discordメッセージ送信エラー: {response.status_code}")
+                print(response.text)
+        self.last_post_time = time.time()
 
     def send_discord_image(self, image_path: str, caption: str = ""):
         """
@@ -449,20 +454,26 @@ class Notifier:
         :param image_path: 送信する画像のファイルパス
         :param caption: 画像と一緒に送るメッセージ（オプション）
         """
-        full_caption = self.generate_prefix()
-        if caption:
-            full_caption += "---------------------------------------------\n" + caption + "---------------------------------------------\n"
+        if self.enable_message:
+            full_caption = self.generate_prefix()
+            if caption:
+                full_caption += "---------------------------------------------\n" + caption + "---------------------------------------------\n"
 
-        with open(image_path, "rb") as image_file:
-            files = {"file": image_file}
-            data = {"content": full_caption}
-            response = requests.post(self.webhook_url, data=data, files=files)
+            with open(image_path, "rb") as image_file:
+                files = {"file": image_file}
+                data = {"content": full_caption}
+                response = requests.post(self.webhook_url, data=data, files=files)
 
-        if response.status_code == 204:
-            print("✅ 画像送信成功！")
-        else:
-            print(f"⚠️ エラー: {response.status_code}")
-            print(response.text)
+            if response.status_code == 204:
+                print("✅ 画像送信成功！")
+            else:
+                print(f"⚠️ エラー: {response.status_code}")
+                print(response.text)
+        self.last_post_time = time.time()
+
+    def send_ok_post(self):
+        if time.time() - self.last_post_time > self.ok_post_interval:
+            self.send_discord_message("✅ 定期報告：正常に周回中！")
 
 
 class PenaltyCounter:
@@ -838,10 +849,6 @@ class HandleRecaptcha:
         vpn_manager = VpnManager()
         vpn_manager.use_vpn = False
         Action.reset(show_message=False)
-        if ImageRecognizer.locate_center("isStatus"):
-            notifier = Notifier()
-            notifier.send_discord_message(
-                "🚨 新ウィンドウウインドウ立ち上げてステータス画面遷移無事完了（確認できたらこのメッセージ消す！）")
 
     @staticmethod
     def check_recaptcha2(jump_key, wait_key):
@@ -1123,8 +1130,12 @@ class Macro:
                     time.sleep(1)
                     idling_time += time.time() - start_time
 
-                if idling_time > 600:
+                idling_thresh = 10  # min
+                if idling_time > 60*idling_thresh:
+                    notifier.send_discord_message(f"⚠️ 突っかかっているみたいで、ページ遷移が{idling_thresh}分間行われていません。一度ログインし直します。")
                     Action.reset()
+
+                notifier.send_ok_post()
 
     @staticmethod
     def kamo_gari():
@@ -1173,18 +1184,21 @@ class Macro:
                 if ImageRecognizer.locate_center(check_key):
                     HandleRecaptcha.check_recaptcha(check_key, wait_key)
 
+            notifier.enable_message = False  # 高確率でエラーページに飛ばされるので、このタイミングで飛ばされた場合は想定どおりとして通知をしない（うるさいから）
             # HandleRecaptcha.capture_screenshot("after")
             JumpManager.jump_to_madatuzukeru()
             # HandleRecaptcha.capture_screenshot("negirai")
             JumpManager.jump_to_status()
+            notifier.enable_message = True
+
             if ImageRecognizer.locate_center("isStatus"):
                 # 立ち上がっているはずのChrome新Windowを閉じる
                 pyautogui.hotkey("alt", "f4")
                 time.sleep(2)
-                # debugモードクロムに対してアカウントログインし直して認証突破になるはず。
+                # debugモードのChromeの方でアカウントにログインし直して、認証突破扱いになるはず。
                 vpn_manager = VpnManager()
                 vpn_manager.use_vpn = vpn_manager.user_setting
-                Action.reset()
+                Action.reset(show_message=False)
                 if ImageRecognizer.locate_center("isStatus"):
                     notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
