@@ -2,7 +2,7 @@
 import setproctitle
 from AutoFFB import *
 
-# pyinstaller --onefile --noconsole --name=Key2Key2 --add-binary="chromedriver.exe;." Key2Key2.py
+# pyinstaller --onefile --name=Key2Key2 --add-binary="chromedriver.exe;." Key2Key2.py
 
 # 実行プロセス名を偽装
 setproctitle.setproctitle("Key2Key2")
