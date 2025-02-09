@@ -1175,29 +1175,26 @@ class Macro:
 
             # まずは怪しくないChromeセッションを立ち上げる
             HandleRecaptcha.login_another_window()
-            if not ImageRecognizer.locate_center("keitai"):
-                notifier.send_discord_message("🚨 bot検知解決中に想定外の事が起きました。新しいウィンドウでの再ログイン時に携帯電話画面になりませんでした。")
-                sys.exit()
+            if ImageRecognizer.locate_center("keitai"):
+                HandleRecaptcha.wait_for_captcha_ready()
+                # HandleRecaptcha.capture_screenshot("before")
 
-            HandleRecaptcha.wait_for_captcha_ready()
-            # HandleRecaptcha.capture_screenshot("before")
+                checks = [
+                    ("recaptcha-check", "recaptcha-success"),
+                    ("cloudflare-check", "cloudflare-success"),
+                    ("cloudflare-check-02", "cloudflare-success-02")
+                ]
 
-            checks = [
-                ("recaptcha-check", "recaptcha-success"),
-                ("cloudflare-check", "cloudflare-success"),
-                ("cloudflare-check-02", "cloudflare-success-02")
-            ]
+                for check_key, wait_key in checks:
+                    if ImageRecognizer.locate_center(check_key):
+                        HandleRecaptcha.check_recaptcha(check_key, wait_key)
 
-            for check_key, wait_key in checks:
-                if ImageRecognizer.locate_center(check_key):
-                    HandleRecaptcha.check_recaptcha(check_key, wait_key)
-
-            notifier.enable_message = False  # 高確率でエラーページに飛ばされるので、このタイミングで飛ばされた場合は想定どおりとして通知をしない（うるさいから）
-            # HandleRecaptcha.capture_screenshot("after")
-            JumpManager.jump_to_madatuzukeru()
-            # HandleRecaptcha.capture_screenshot("negirai")
-            JumpManager.jump_to_status()
-            notifier.enable_message = True
+                notifier.enable_message = False  # 高確率でエラーページに飛ばされるので、このタイミングで飛ばされた場合は想定どおりとして通知をしない（うるさいから）
+                # HandleRecaptcha.capture_screenshot("after")
+                JumpManager.jump_to_madatuzukeru()
+                # HandleRecaptcha.capture_screenshot("negirai")
+                JumpManager.jump_to_status()
+                notifier.enable_message = True
 
             if ImageRecognizer.locate_center("isStatus"):
                 # 立ち上がっているはずのChrome新Windowを閉じる
@@ -1210,10 +1207,10 @@ class Macro:
                 if ImageRecognizer.locate_center("isStatus"):
                     notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
-                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
+                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:01")
                     sys.exit()
             else:
-                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。")
+                notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:02")
                 sys.exit()
 
 
