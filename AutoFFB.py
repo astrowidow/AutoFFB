@@ -17,6 +17,7 @@ from scipy.interpolate import interp1d
 import matplotlib.pyplot as plt
 import setproctitle
 import atexit
+import math
 
 
 class IPManager:
@@ -416,6 +417,7 @@ class Notifier:
             self.ok_post_interval = 3*60*60  # 3時間
             self.last_post_time = time.time()
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+            self.account_info = AccountInfo()
 
     def add_webhook(self, webhook_url):
         self.webhook_url = webhook_url
@@ -474,7 +476,8 @@ class Notifier:
 
     def send_ok_post(self):
         if time.time() - self.last_post_time > self.ok_post_interval:
-            self.send_discord_message("✅ 定期報告：正常に周回中！")
+            # self.send_discord_message(f"✅ 定期報告：正常に周回中！\n現在の白所持個数{self.account_info.shiro_num}個")
+            self.send_discord_message(f"✅ 定期報告：正常に周回中！")
 
 
 class PenaltyCounter:
@@ -527,6 +530,61 @@ class VpnManager:
     def enable(self, flag=True):
         self.use_vpn = flag
         self.user_setting = flag
+
+
+class AccountInfo:
+    # ここまで実装したもののスクロールで隠れる問題があるので一旦やめ。
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(AccountInfo, cls).__new__(cls)
+        return cls._instance  # インスタンスを作るだけ（変数の初期化はしない）
+
+    def __init__(self):
+        if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.shiro_num = 0
+            self.mizu_num = 0
+            self.zya_num = 0
+            self.hi_num = 0
+            self.optimal_shiro_num = 0
+            self.optimal_mizu_num = 0
+            self.optimal_hi_num = 0
+            self.optimal_zya_num = 0
+            # ----------------------------------------------------------
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
+
+    def calc_optimal_kouseki_ratio(self):
+        if self.shiro_num == 0:
+            # 白が0なら他も0にする
+            self.optimal_shiro_num = 0
+            self.optimal_mizu_num = 0
+            self.optimal_hi_num = 0
+            self.optimal_zya_num = 0
+            return
+
+        # 白を 8 としたときのスケール
+        scale = self.shiro_num / 8.0
+
+        # 各鉱石の最適値を計算（切り上げ）
+        self.optimal_shiro_num = self.shiro_num  # 白はそのまま
+        self.optimal_mizu_num = math.ceil(6 * scale)
+        self.optimal_hi_num = math.ceil(3 * scale)
+        self.optimal_zya_num = math.ceil(3 * scale)
+
+    def is_kouseki_needed(self, kouseki_type):
+        """
+        各鉱石が必要かどうかを判定する
+        - kouseki_type: "mizu", "hi", "zya" のいずれか
+        """
+        if kouseki_type == "mizu":
+            return self.mizu_num <= self.optimal_mizu_num
+        elif kouseki_type == "hi":
+            return self.hi_num <= self.optimal_hi_num
+        elif kouseki_type == "zya":
+            return self.zya_num <= self.optimal_zya_num
+        else:
+            raise ValueError("kouseki_type must be 'mizu', 'hi', or 'zya'")
 
 
 class Action:
@@ -727,6 +785,13 @@ class Action:
             results_hi = ImageRecognizer.locate_all("kouseki-hi")
             results_zya = ImageRecognizer.locate_all("kouseki-zya")
             results_radio = ImageRecognizer.locate_all("radio-button-2")
+
+            account_info = AccountInfo()
+            account_info.shiro_num = len(results_shiro)
+            account_info.mizu_num = len(results_mizu)
+            account_info.hi_num = len(results_hi)
+            account_info.zya_num = len(results_zya)
+            account_info.calc_optimal_kouseki_ratio()
 
             if results_radio:
                 click_ok = True
