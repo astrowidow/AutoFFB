@@ -846,9 +846,7 @@ class HandleRecaptcha:
         pyautogui.press("enter")
         time.sleep(3)  # Chromeの起動を待つ（環境によって調整）
 
-        # VPNは切っておく。
-        vpn_manager = VpnManager()
-        vpn_manager.use_vpn = False
+        # ログインし直し
         Action.reset(show_message=False)
 
     @staticmethod
@@ -1208,14 +1206,25 @@ class Macro:
                 pyautogui.hotkey("alt", "f4")
                 time.sleep(2)
                 # debugモードのChromeの方でアカウントにログインし直して、認証突破扱いになるはず。
-                vpn_manager = VpnManager()
-                vpn_manager.use_vpn = vpn_manager.user_setting
                 Action.reset(show_message=False)
                 if ImageRecognizer.locate_center("isStatus"):
                     notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
                     notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:01")
                     sys.exit()
+            elif ImageRecognizer.locate_center("penalty"):
+                # 認証呼び出し過ぎでアカウントにペナルティがつくケース？
+                notifier.send_discord_message("⚠️ bot認証突破のための新規ページにてペナルティ発生。時間を開けて再トライします。")
+
+                # 立ち上がっているはずのChrome新Windowを閉じる
+                pyautogui.hotkey("alt", "f4")
+                time.sleep(2)
+
+                # 少し休んでから次のループで再度認証を試みる。
+                rest_time = 30  # min
+                time.sleep(rest_time*60)
+                JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
+
             else:
                 notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:02")
                 sys.exit()
