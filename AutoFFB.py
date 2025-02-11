@@ -981,14 +981,20 @@ class HandleRecaptcha:
                 target_y = location[1] + random.randint(340, 540)
                 HandleRecaptcha.human_like_mouse_move((start_x, start_y), (target_x, target_y), pointer_moving_duration)
 
+                # click後checkboxの状態が遷移するまでの待ち時間
+                time.sleep(1)
+
                 check_interval = 0.1  # sec
                 while True:
                     if ImageRecognizer.locate_center(wait_key):
                         check_success = True
                         break
-                    elif ImageRecognizer.locate_center(jump_key):
+                    elif ImageRecognizer.locate_center(jump_key) and ImageRecognizer.locate_center("rest-kankoku"):
+                        # もとのチェックマークが出てきたらもう一度挑戦。
+                        # ただ、Google Recaptchaは空チェックマーク戻って画像遷移ポップアップが出る場合があるため、
+                        # この目の条件である rest-kankokuが表示されていることも必要（ポップアップが出ると rest-kankoku が隠れる）
                         challenge_count += 1
-                        randint = random.randint(1,100)
+                        randint = random.randint(1, 100)
                         if randint > 90:
                             randint = random.randint(300000, 600000)
                             sleepsec = randint/1000
@@ -1353,6 +1359,7 @@ class ImageRecognizer:
         "ffb-icon": {"filename": "ffb-icon.png", "confidence": 0.8, "region": (516, 1, 1905, 229)},
         "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (516, 1, 1905, 502)},
         "penalty": {"filename": "penalty.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
+        "rest-kankoku": {"filename": "rest-kankoku.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
