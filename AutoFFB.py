@@ -90,7 +90,7 @@ class IPManager:
             print(f"⚠️ Chrome経由でのIP取得エラー: {e}")
             return ""
 
-    def wait_for_ip_recovery(self, max_wait_time=1800, target_stable_time=600, check_interval=30):
+    def wait_for_ip_recovery(self, max_wait_time=600, target_stable_time=120, check_interval=30):
         elapsed_time = 0
         last_ip = ""
         stable_time = 0
@@ -233,7 +233,7 @@ class JumpHandler:
         else:
             return "ButtonNotFound"
 
-    def wait_for_transition(self, wait_key, react_keitai=True, react_error=True, waiting_interval=50):
+    def wait_for_transition(self, wait_key, react_keitai=True, react_error=True, waiting_interval=200):
         start_time = time.time()
         while time.time() - start_time < self.transition_timeout:
             if ImageRecognizer.locate_center(wait_key):
@@ -594,50 +594,67 @@ class Action:
         if show_message:
             notifier.send_discord_message("⚠️ リセットシーケンスが開始されました。")
 
-        # ipアドレスリセット
-        JumpManager.jump_to_vpn_setting()
-        JumpManager.jump_to_vpn_switch_to_turn_off()
-        pyautogui.press("esc")
-        time.sleep(10)
-        ip_manager = IPManager()
-        ip_manager.reset_ip()
-
-        # ログインリセット
-        JumpManager.jump_to_ffb_top_page()
-        time.sleep(10)
-        # ... id入力
-        login_manager = LoginManager()
-        account = login_manager.current_account
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(1)
-        pyautogui.press("backspace")
-        time.sleep(1)
-        pyautogui.write(account["id"], 1)  # 1sec毎にタイプ
-        pyautogui.press("tab")
-        time.sleep(10)
-        # ... pass入力
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(1)
-        pyautogui.press("backspace")
-        time.sleep(1)
-        pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
-        time.sleep(10)
-        # ... ログイン
-        vpn_manager = VpnManager()
-        if vpn_manager.use_vpn:
+        while True:
+            # ipアドレスリセット
             JumpManager.jump_to_vpn_setting()
-            JumpManager.jump_to_vpn_switch_to_turn_on()
+            JumpManager.jump_to_vpn_switch_to_turn_off()
             pyautogui.press("esc")
             time.sleep(10)
+            ip_manager = IPManager()
             ip_manager.reset_ip()
-        JumpManager.jump_to_login_button()
-        time.sleep(5)
-        while True:
-            if ImageRecognizer.locate_center("isStatus"):
-                if show_message:
-                    notifier.send_discord_message("✅ リセットシーケンスが正常に終了し、ステータス画面が表示されました。")
-                break
-            if ImageRecognizer.locate_center("keitai"):
+
+            # ログインリセット
+            JumpManager.jump_to_ffb_top_page()
+            time.sleep(10)
+            # ... id入力
+            login_manager = LoginManager()
+            account = login_manager.current_account
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(1)
+            pyautogui.press("backspace")
+            time.sleep(1)
+            pyautogui.write(account["id"], 1)  # 1sec毎にタイプ
+            pyautogui.press("tab")
+            time.sleep(10)
+            # ... pass入力
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(1)
+            pyautogui.press("backspace")
+            time.sleep(1)
+            pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
+            time.sleep(10)
+            # ... ログイン
+            vpn_manager = VpnManager()
+            if vpn_manager.use_vpn:
+                JumpManager.jump_to_vpn_setting()
+                JumpManager.jump_to_vpn_switch_to_turn_on()
+                pyautogui.press("esc")
+                time.sleep(10)
+                ip_manager.reset_ip()
+            JumpManager.jump_to_login_button()
+            time.sleep(5)
+
+            start_time = 0
+            max_transition_time = 60  # sec
+            check_interval = 1  # sec
+            while True:
+                if ImageRecognizer.locate_center("isStatus"):
+                    try_again = False
+                    if show_message:
+                        notifier.send_discord_message("✅ リセットシーケンスが正常に終了し、ステータス画面が表示されました。")
+                    break
+                if ImageRecognizer.locate_center("keitai"):
+                    try_again = False
+                    break
+                if time.time() - start_time < max_transition_time:
+                    rest_min = 10
+                    print(f"ログインし直しましたが、ステータス画面への遷移ができません。{rest_min}分の休憩後、もう一度ログイントライしてみます。")
+                    try_again = True
+                    time.sleep(rest_min*60)
+                    break
+                time.sleep(check_interval)
+
+            if not try_again:
                 break
 
     @staticmethod
@@ -953,7 +970,7 @@ class HandleRecaptcha:
         check_success = False
         start_time = time.time()
         challenge_count = 0
-        while challenge_count < 30:
+        while challenge_count < 10:
             location = ImageRecognizer.locate_center(jump_key)
             if location:
                 # ip_manager = IPManager()
@@ -984,7 +1001,7 @@ class HandleRecaptcha:
                 # click後checkboxの状態が遷移するまでの待ち時間
                 time.sleep(1)
 
-                check_interval = 0.1  # sec
+                check_interval = 0.2  # sec
                 while True:
                     if ImageRecognizer.locate_center(wait_key):
                         check_success = True
@@ -1001,6 +1018,7 @@ class HandleRecaptcha:
                             print(f"{sleepsec}秒休憩")
                             time.sleep(sleepsec)
                         break
+                    print("チェック状態の変化を待っています")
                     time.sleep(check_interval)
                 if check_success:
                     break
@@ -1019,6 +1037,7 @@ class HandleRecaptcha:
         while True:
             if any(ImageRecognizer.locate_center(key) for key in wait_keys):
                 break
+            print("チェック描画待機中・・・・・・・")
             time.sleep(waiting_interval)
 
         print("CAPTCHAのチェックボタンの描画が完了しました。")
