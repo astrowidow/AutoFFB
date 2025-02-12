@@ -18,6 +18,10 @@ import matplotlib.pyplot as plt
 import setproctitle
 import atexit
 import math
+import pyperclip
+from bs4 import BeautifulSoup
+from collections import Counter
+import lxml
 
 
 class IPManager:
@@ -376,8 +380,10 @@ class LoginManager:
             self.account_table = {}
             self.switch_times = []
             self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
-            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
             self.current_account = {}
+            self.notifier = Notifier()
+            # -----------------------------------------------------------------------------
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def add_account(self, switch_time, user_id, password):
         """アカウント情報を追加"""
@@ -397,6 +403,7 @@ class LoginManager:
         new_account = self.get_current_account()
         if new_account["id"] != self.current_account["id"]:
             self.current_account = new_account
+            self.notifier.b_notify_account = True
             return True
         else:
             return False
@@ -416,8 +423,10 @@ class Notifier:
             self.enable_message = True
             self.ok_post_interval = 3*60*60  # 3時間
             self.last_post_time = time.time()
-            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
             self.account_info = AccountInfo()
+            self.b_notify_account = True
+            # --------------------------------------------------------
+            self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def add_webhook(self, webhook_url):
         self.webhook_url = webhook_url
@@ -478,6 +487,19 @@ class Notifier:
         if time.time() - self.last_post_time > self.ok_post_interval:
             # self.send_discord_message(f"✅ 定期報告：正常に周回中！\n現在の白所持個数{self.account_info.shiro_num}個")
             self.send_discord_message(f"✅ 定期報告：正常に周回中！")
+
+    def send_account_info(self):
+        if self.b_notify_account:
+            # アカウント情報通知はアカウント切り替え後一回のみ。
+            # Trueになるのは、次のアカウント切り替えが起こった時。
+            self.b_notify_account = False
+            account_info_str = (f"✅ アカウント情報を送信します。\n"
+                                f"現在の所持鉱石:\n"
+                                f"白: {self.account_info.shiro_num}\n"
+                                f"水: {self.account_info.mizu_num}\n"
+                                f"火: {self.account_info.hi_num}\n"
+                                f"邪: {self.account_info.zya_num}")
+            self.send_discord_message(account_info_str)
 
 
 class PenaltyCounter:
@@ -547,7 +569,7 @@ class AccountInfo:
             self.mizu_num = 0
             self.zya_num = 0
             self.hi_num = 0
-            self.optimal_shiro_num = 0
+            self.optimal_shiro_num = 99999
             self.optimal_mizu_num = 0
             self.optimal_hi_num = 0
             self.optimal_zya_num = 0
@@ -556,23 +578,21 @@ class AccountInfo:
 
     def calc_optimal_kouseki_ratio(self):
         if self.shiro_num == 0:
-            # 白が0なら他も0にする
-            self.optimal_shiro_num = 0
-            self.optimal_mizu_num = 0
-            self.optimal_hi_num = 0
-            self.optimal_zya_num = 0
+            # 白が0なら他は1にする
+            self.optimal_mizu_num = 1
+            self.optimal_hi_num = 1
+            self.optimal_zya_num = 1
             return
 
         # 白を 8 としたときのスケール
         scale = self.shiro_num / 8.0
 
         # 各鉱石の最適値を計算（切り上げ）
-        self.optimal_shiro_num = self.shiro_num  # 白はそのまま
         self.optimal_mizu_num = math.ceil(6 * scale)
         self.optimal_hi_num = math.ceil(3 * scale)
         self.optimal_zya_num = math.ceil(3 * scale)
 
-    def is_kouseki_needed(self, kouseki_type):
+    def judge_kouseki_necessity(self, kouseki_type):
         """
         各鉱石が必要かどうかを判定する
         - kouseki_type: "mizu", "hi", "zya" のいずれか
@@ -585,6 +605,53 @@ class AccountInfo:
             return self.zya_num <= self.optimal_zya_num
         else:
             raise ValueError("kouseki_type must be 'mizu', 'hi', or 'zya'")
+
+    def update_current_kouseki_num(self):
+        if ImageRecognizer.locate_center("is-shuppin"):
+            pyautogui.hotkey("ctrl", "u")
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "c")
+            time.sleep(0.5)
+            pyautogui.hotkey("ctrl", "w")
+            html_content = pyperclip.paste()
+            kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
+            self.mizu_num = kouseki_counter["水のアクアマリン"]
+            self.hi_num = kouseki_counter["火のルビー"]
+            self.zya_num = kouseki_counter["邪のオブシダン"]
+            self.shiro_num = kouseki_counter["白マテリア"]
+            self.calc_optimal_kouseki_ratio()
+
+    @staticmethod
+    def parse_item_from_html(html_content, target_title):
+        # クリップボードからHTMLを取得
+        soup = BeautifulSoup(html_content, 'lxml')
+
+        # テーブルタイトルを探す
+        titles = soup.find_all('b')
+
+        for title in titles:
+            if title.parent.name == 'center' and title.text.strip() == f"-{target_title}-":
+                # タイトルの次にあるテーブルを探す
+                table = title.find_next('table')
+                if not table:
+                    return Counter()
+
+                rows = table.find_all('tr')
+                if len(rows) < 2:  # ヘッダー行だけならスキップ
+                    return Counter()
+
+                # 2列目のデータを取得（1行目はスキップ）
+                items = [
+                    row.find_all('td')[1].text.strip()
+                    for row in rows[1:] if len(row.find_all('td')) > 1
+                ]
+
+                # アイテム数をカウント
+                return Counter(items)
+
+        return Counter()  # 指定したタイトルが見つからなかった場合
 
 
 class Action:
@@ -792,6 +859,9 @@ class Action:
         lower_limit_kouseki = 0
 
         while True:
+            account_info = AccountInfo()
+            account_info.update_current_kouseki_num()
+
             pyautogui.press("end")
             time.sleep(3)
             result_kouseki = ImageRecognizer.locate_center("kouseki")
@@ -803,19 +873,13 @@ class Action:
             results_zya = ImageRecognizer.locate_all("kouseki-zya")
             results_radio = ImageRecognizer.locate_all("radio-button-2")
 
-            account_info = AccountInfo()
-            account_info.shiro_num = len(results_shiro)
-            account_info.mizu_num = len(results_mizu)
-            account_info.hi_num = len(results_hi)
-            account_info.zya_num = len(results_zya)
-            account_info.calc_optimal_kouseki_ratio()
-
             if results_radio:
                 click_ok = True
                 for result_radio in results_radio:
                     click_ok = True
                     if lower_limit_kouseki > result_radio[1]:
                         click_ok = False
+
                     for result_shiro in results_shiro:
                         lower_limit_y = result_shiro[1] - forbidden_range
                         upper_limit_y = result_shiro[1] + forbidden_range
@@ -824,12 +888,29 @@ class Action:
                             break
 
                     if collect_various_kouseki:
-                        for result in results_mizu + results_hi + results_zya:
+                        for result in results_mizu:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
                             if lower_limit_y <= result_radio[1] <= upper_limit_y:
-                                click_ok = False
-                                break
+                                if account_info.judge_kouseki_necessity("mizu"):
+                                    click_ok = False
+                                    break
+
+                        for result in results_hi:
+                            lower_limit_y = result[1] - forbidden_range
+                            upper_limit_y = result[1] + forbidden_range
+                            if lower_limit_y <= result_radio[1] <= upper_limit_y:
+                                if account_info.judge_kouseki_necessity("hi"):
+                                    click_ok = False
+                                    break
+
+                        for result in results_zya:
+                            lower_limit_y = result[1] - forbidden_range
+                            upper_limit_y = result[1] + forbidden_range
+                            if lower_limit_y <= result_radio[1] <= upper_limit_y:
+                                if account_info.judge_kouseki_necessity("zya"):
+                                    click_ok = False
+                                    break
 
                     if click_ok:
                         pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
@@ -1202,6 +1283,7 @@ class Macro:
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
             Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki)
+            notifier.send_account_info()
 
             loop_num = random.randint(375, 854)
             for _ in range(loop_num):
