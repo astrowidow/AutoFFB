@@ -240,11 +240,11 @@ class JumpHandler:
 class JumpManager:
     @staticmethod
     def jump_to_champ():
-        JumpHandler("champ", "is-champ", time_after_confirmation_range=(3249, 4836)).jump_with_confirmation()
+        JumpHandler("champ", "is-champ", time_after_confirmation_range=(2049, 2536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_bougu():
-        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(2249, 2836)).jump_with_confirmation()
+        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(1249, 1836)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_challenge_character():
@@ -252,34 +252,34 @@ class JumpManager:
 
     @staticmethod
     def jump_to_status():
-        JumpHandler("to-status", "isStatus", time_after_confirmation_range=(2249, 5236)).jump_with_confirmation()
+        JumpHandler("to-status", "isStatus", time_after_confirmation_range=(1549, 3236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_status():
-        JumpHandler("auc", "is-auc", time_after_confirmation_range=(2249, 3236)).jump_with_confirmation()
+        JumpHandler("auc", "is-auc", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_shuppin_result():
-        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(2249, 3236)).jump_with_confirmation()
+        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_select():
-        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(2249, 3236)).jump_with_confirmation()
+        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(1249, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_result():
-        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(2249, 3236)).jump_with_confirmation()
+        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_manomori():
-        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(1549, 2336),
+        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(2149, 2336),
                     offset_x=83).jump_with_confirmation()
 
     @staticmethod
     def jump_to_saishu():
-        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(1549, 2336)).jump_with_confirmation()
-        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(1549, 2336)).jump_with_confirmation()
-        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(1549, 2336),
+        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(1049, 1536)).jump_with_confirmation()
+        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(1049, 1536)).jump_with_confirmation()
+        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(2149, 2336),
                     offset_x=80).jump_with_confirmation()
 
     @staticmethod
@@ -301,17 +301,17 @@ class JumpManager:
 
     @staticmethod
     def jump_to_madatuzukeru():
-        JumpHandler("mada-tudukeru", "is-madatuzukeru", time_after_confirmation_range=(1049, 1336),
+        JumpHandler("mada-tudukeru", "is-madatuzukeru", time_after_confirmation_range=(2549, 3336),
                     react_keitai=False).jump_with_confirmation()
 
     @staticmethod
     def jump_to_vpn_setting():
         print("VPN設定メニューを開きます。")
         if ImageRecognizer.locate_center("vpn-icon-on"):
-            JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(3049, 5336),
+            JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(2049, 2136),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
         elif ImageRecognizer.locate_center("vpn-icon-off"):
-            JumpHandler("vpn-icon-off", "vpn-window", time_after_confirmation_range=(3049, 5336),
+            JumpHandler("vpn-icon-off", "vpn-window", time_after_confirmation_range=(2049, 2136),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
     @staticmethod
@@ -340,7 +340,7 @@ class JumpManager:
     def jump_to_ffb_top_page():
         print("FFBトップページに移動します。")
         if ImageRecognizer.locate_center("ffb-icon"):
-            JumpHandler("ffb-icon", "ffb-login", time_after_confirmation_range=(3049, 5336),
+            JumpHandler("ffb-icon", "ffb-login", time_after_confirmation_range=(1049, 2336),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
         else:
             assert True, "FFBトップページが見当たりません・・・"
@@ -348,7 +348,7 @@ class JumpManager:
     @staticmethod
     def jump_to_login_button():
         if ImageRecognizer.locate_center("ffb-login"):
-            JumpHandler("ffb-login", "isStatus", time_after_confirmation_range=(3049, 5336),
+            JumpHandler("ffb-login", "isStatus", time_after_confirmation_range=(1049, 2336),
                         react_keitai=True, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
 
@@ -597,11 +597,11 @@ class AccountInfo:
     def update_current_kouseki_num(self):
         if ImageRecognizer.locate_center("is-shuppin"):
             pyautogui.hotkey("ctrl", "u")
-            time.sleep(0.5)
+            time.sleep(0.3)
             pyautogui.hotkey("ctrl", "a")
-            time.sleep(0.5)
+            time.sleep(0.1)
             pyautogui.hotkey("ctrl", "c")
-            time.sleep(0.5)
+            time.sleep(0.1)
             pyautogui.hotkey("ctrl", "w")
             html_content = pyperclip.paste()
             kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
@@ -654,40 +654,36 @@ class Action:
             JumpManager.jump_to_vpn_setting()
             JumpManager.jump_to_vpn_switch_to_turn_off()
             pyautogui.press("esc")
-            time.sleep(10)
             ip_manager = IPManager()
             ip_manager.reset_ip()
 
             # ログインリセット
             JumpManager.jump_to_ffb_top_page()
-            time.sleep(10)
             # ... id入力
             login_manager = LoginManager()
             account = login_manager.current_account
             pyautogui.hotkey("ctrl", "a")
-            time.sleep(1)
+            time.sleep(0.5)
             pyautogui.press("backspace")
-            time.sleep(1)
-            pyautogui.write(account["id"], 1)  # 1sec毎にタイプ
+            time.sleep(0.5)
+            pyautogui.write(account["id"], 0.5)  # 1sec毎にタイプ
             pyautogui.press("tab")
-            time.sleep(10)
+            time.sleep(0.5)
             # ... pass入力
             pyautogui.hotkey("ctrl", "a")
-            time.sleep(1)
+            time.sleep(0.5)
             pyautogui.press("backspace")
+            time.sleep(0.5)
+            pyautogui.write(account["password"], 0.5)  # 1sec毎にタイプ
             time.sleep(1)
-            pyautogui.write(account["password"], 1)  # 1sec毎にタイプ
-            time.sleep(10)
             # ... ログイン
             vpn_manager = VpnManager()
             if vpn_manager.use_vpn:
                 JumpManager.jump_to_vpn_setting()
                 JumpManager.jump_to_vpn_switch_to_turn_on()
                 pyautogui.press("esc")
-                time.sleep(10)
                 ip_manager.reset_ip()
             JumpManager.jump_to_login_button()
-            time.sleep(5)
 
             start_time = 0
             max_transition_time = 60  # sec
@@ -791,7 +787,7 @@ class Action:
         if ImageRecognizer.locate_center("auc"):
             JumpManager.jump_to_auction_from_status()
             pyautogui.press("end")
-            time.sleep(1)
+            time.sleep(0.5)
             JumpManager.jump_to_shuppin_select()
             Action.sell_loop_all_gomi_kouseki(collect_various_kouseki)
         Action.home()
@@ -831,7 +827,7 @@ class Action:
                         if click_ok:
                             pyautogui.moveTo(result_sell[0], result_sell[1], 0.2)
                             pyautogui.click(result_sell[0], result_sell[1])
-                            time.sleep(3)
+                            time.sleep(1)
                             JumpManager.jump_to_bougu()
                             break
                     if not click_ok:
@@ -850,8 +846,10 @@ class Action:
             account_info = AccountInfo()
             account_info.update_current_kouseki_num()
 
+            time.sleep(0.5)
             pyautogui.press("end")
-            time.sleep(3)
+            time.sleep(0.5)
+
             result_kouseki = ImageRecognizer.locate_center("kouseki")
             if result_kouseki:
                 lower_limit_kouseki = result_kouseki[1]
@@ -903,13 +901,13 @@ class Action:
                     if click_ok:
                         pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
                         pyautogui.click(result_radio[0], result_radio[1], duration=0.5)
-                        time.sleep(2)
+                        time.sleep(0.5)
                         pyautogui.press("tab")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         JumpManager.jump_to_shuppin_result()
                         JumpManager.jump_to_auction_from_shuppin_result()
                         pyautogui.press("end")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         JumpManager.jump_to_shuppin_select()
                         break
                 if not click_ok:
@@ -924,12 +922,12 @@ class Action:
         Action.home()
         JumpManager.jump_to_auction_from_status()
         pyautogui.press("end")
-        time.sleep(2)
+        time.sleep(0.5)
         JumpManager.jump_to_shuppin_select()
 
         while True:
             pyautogui.press("end")
-            time.sleep(3)
+            time.sleep(0.5)
             results_shiro = ImageRecognizer.locate_all("kouseki-shiro")
             results_mizu = ImageRecognizer.locate_all("kouseki-mizu")
             results_hi = ImageRecognizer.locate_all("kouseki-hi")
@@ -955,21 +953,21 @@ class Action:
                     if click_ok:
                         pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
                         pyautogui.click(result_radio[0], result_radio[1])
-                        time.sleep(2)
+                        time.sleep(1)
                         pyautogui.press("tab")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         pyautogui.press("tab")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         pyautogui.press("x", presses=8, interval=0.2)
                         pyautogui.press("tab")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         pyautogui.press("2")
                         pyautogui.press("0", presses=13 if not is_shiro else 12, interval=0.2)
 
                         JumpManager.jump_to_shuppin_result()
                         JumpManager.jump_to_auction_from_shuppin_result()
                         pyautogui.press("end")
-                        time.sleep(2)
+                        time.sleep(0.5)
                         JumpManager.jump_to_shuppin_select()
                         break
                 if not click_ok:
@@ -987,15 +985,15 @@ class HandleRecaptcha:
     def login_another_window():
         # ✅ Winキーと同じ効果があるショートカット。レジストリでWin無効のマシンもあるので。
         pyautogui.hotkey("ctrl", "esc")
-        time.sleep(2)  # スタートメニューが開くのを待機
+        time.sleep(1)  # スタートメニューが開くのを待機
 
         # ✅ "chrome" を入力
         pyautogui.write("chrome", interval=0.2)
-        time.sleep(2)  # 入力が完了するのを待つ
+        time.sleep(1)  # 入力が完了するのを待つ
 
         # ✅ Enterキーを押してChromeを開く
         pyautogui.press("enter")
-        time.sleep(3)  # Chromeの起動を待つ（環境によって調整）
+        time.sleep(2)  # Chromeの起動を待つ（環境によって調整）
 
         # ログインし直し
         Action.reset(show_message=False)
@@ -1241,14 +1239,12 @@ class Macro:
                 JumpManager.jump_to_vpn_setting()
                 JumpManager.jump_to_vpn_switch_to_turn_on()
                 pyautogui.press("esc")
-                time.sleep(10)
                 ip_manager = IPManager()
                 ip_manager.reset_ip()
             else:
                 JumpManager.jump_to_vpn_setting()
                 JumpManager.jump_to_vpn_switch_to_turn_off()
                 pyautogui.press("esc")
-                time.sleep(10)
                 ip_manager = IPManager()
                 ip_manager.reset_ip()
         else:
@@ -1368,7 +1364,7 @@ class Macro:
             if ImageRecognizer.locate_center("isStatus"):
                 # 立ち上がっているはずのChrome新Windowを閉じる
                 pyautogui.hotkey("alt", "f4")
-                time.sleep(2)
+                time.sleep(1)
                 # debugモードのChromeの方でアカウントにログインし直して、認証突破扱いになるはず。
                 Action.reset(show_message=False)
                 if ImageRecognizer.locate_center("isStatus"):
@@ -1382,7 +1378,7 @@ class Macro:
 
                 # 立ち上がっているはずのChrome新Windowを閉じる
                 pyautogui.hotkey("alt", "f4")
-                time.sleep(2)
+                time.sleep(1)
 
                 # 少し休んでから次のループで再度認証を試みる。
                 rest_time = 30  # min
