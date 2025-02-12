@@ -382,6 +382,7 @@ class LoginManager:
             self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
             self.current_account = {}
             self.notifier = Notifier()
+            self.account_info = AccountInfo()
             # -----------------------------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
@@ -404,6 +405,7 @@ class LoginManager:
         if new_account["id"] != self.current_account["id"]:
             self.current_account = new_account
             self.notifier.b_notify_account = True
+            self.account_info.last_keitai_time = time.time()
             return True
         else:
             return False
@@ -573,6 +575,7 @@ class AccountInfo:
             self.optimal_mizu_num = 0
             self.optimal_hi_num = 0
             self.optimal_zya_num = 0
+            self.last_keitai_time = time.time()
             # ----------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
@@ -1347,8 +1350,12 @@ class Macro:
     @staticmethod
     def hundle_keitai_denwa():
         if ImageRecognizer.locate_center("keitai"):
+            account_info = AccountInfo()
+            keitai_interval_min = (time.time() - account_info.last_keitai_time)/60
+            account_info.last_keitai_time = time.time()
             notifier = Notifier()
-            notifier.send_discord_message("⚠️ bot検知ページに遷移しました。認証突破を試みます。")
+            notifier.send_discord_message(f"⚠️ bot検知ページに遷移しました。認証突破を試みます。\n"
+                                          f"インターバル: {keitai_interval_min} min")
 
             # まずは怪しくないChromeセッションを立ち上げる
             HandleRecaptcha.login_another_window()
