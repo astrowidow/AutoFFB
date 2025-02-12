@@ -1264,6 +1264,8 @@ class Macro:
                 notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
 
             Action.home()
+            pyautogui.press("esc")
+
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
             Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki)
