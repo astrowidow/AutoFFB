@@ -576,9 +576,10 @@ class AccountInfo:
         scale = self.shiro_num / 8.0
 
         # 各鉱石の最適値を計算（切り上げ）
-        self.optimal_mizu_num = math.ceil(6 * scale)
-        self.optimal_hi_num = math.ceil(3 * scale)
-        self.optimal_zya_num = math.ceil(3 * scale)
+        tiny_value = 0.5  # 白に対してピッタりの比率ではなく、少し余裕を持った数字にしておく。
+        self.optimal_mizu_num = math.ceil(6 * scale + tiny_value)
+        self.optimal_hi_num = math.ceil(3 * scale + tiny_value)
+        self.optimal_zya_num = math.ceil(3 * scale + tiny_value)
 
     def judge_kouseki_necessity(self, kouseki_type):
         """
@@ -1258,8 +1259,9 @@ class Macro:
             if login_manager.check_account_switch():
                 notifier.send_discord_message("⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
                 if not vpn_manager.use_vpn:
-                    notifier.send_discord_message("⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために40分スリープします。")
-                    time.sleep(40 * 60)
+                    rest_time_min = 30
+                    notifier.send_discord_message(f"⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために{rest_time_min}分スリープします。")
+                    time.sleep(rest_time_min * 60)
                 Action.reset()
                 notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
 
@@ -1301,7 +1303,7 @@ class Macro:
                     time.sleep(1)
                     idling_time += time.time() - start_time
 
-                idling_thresh = 10  # min
+                idling_thresh = 5  # min
                 if idling_time > 60*idling_thresh:
                     notifier.send_discord_message(f"⚠️ 突っかかっているみたいで、ページ遷移が{idling_thresh}分間行われていません。一度ログインし直します。")
                     Action.reset()
