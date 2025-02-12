@@ -4,9 +4,10 @@ import time
 import datetime
 import random
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
 import pyautogui
 import requests
 import cv2
@@ -61,33 +62,15 @@ class IPManager:
         try:
             options = Options()
             options.debugger_address = "127.0.0.1:9222"  # 既存のChromeセッションに接続
-            options.add_argument("--disable-blink-features=AutomationControlled")  # 自動操作検出回避
 
-            # ✅ ChromeDriver のパスを取得（pyinstaller に対応）
-            def get_chromedriver_path():
-                if getattr(sys, 'frozen', False):
-                    return os.path.join(sys._MEIPASS, "chromedriver.exe")
-                else:
-                    script_dir = os.path.dirname(os.path.abspath(__file__))
-                    return os.path.join(script_dir, "chromedriver.exe" if os.name == "nt" else "chromedriver")
-            driver_path = get_chromedriver_path()
+            # ✅ 既存の Chrome に接続するだけなので chromedriver を指定しない
+            driver = webdriver.Chrome(options=options)
 
-            service = Service(executable_path=driver_path)
-            driver = webdriver.Chrome(service=service, options=options)
+            driver.get("https://api64.ipify.org")
 
-            # ✅ navigator.webdriver の隠蔽
-            driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
-                "source": "Object.defineProperty(navigator, 'webdriver', {get: () => undefined})"
-            })
-
-            # ✅ C# の `Navigate().GoToUrl()` と同じ動作
-            driver.execute_script("window.location = 'https://api64.ipify.org';")
-
-            # ✅ `<body>` のテキストを取得（即座に実行）
-            element = driver.find_element(By.TAG_NAME, "body")
+            element = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             ip = element.text.strip()
 
-            # 🔥 既存の Chrome を閉じないように `driver.close()` を削除
             return ip
 
         except Exception as e:
@@ -95,46 +78,48 @@ class IPManager:
             return ""
 
     def wait_for_ip_recovery(self, max_wait_time=600, target_stable_time=120, check_interval=30):
-        elapsed_time = 0
-        last_ip = ""
-        stable_time = 0
-        notifier = Notifier()
+        vpn_manager = VpnManager()
+        if vpn_manager.use_vpn:
+            elapsed_time = 0
+            last_ip = ""
+            stable_time = 0
+            notifier = Notifier()
 
-        while elapsed_time < max_wait_time:
-            current_ip = self.get_public_ip()
+            while elapsed_time < max_wait_time:
+                current_ip = self.get_public_ip()
 
-            if not current_ip:
-                print("⚠️ 現在のIPアドレス取得に失敗。再試行します...")
-            elif current_ip == self.initial_ip:
-                if elapsed_time > 0:
-                    print("✅ IPアドレスが元に戻りました。通常処理を続行します。")
-                    notifier.send_discord_message("✅ IPアドレスが元に戻りました。通常処理を続行します。")
-                    self.log_ip_change(self.initial_ip, self.initial_ip, elapsed_time)
-                return
-            else:
-                if current_ip != last_ip:
-                    notifier.send_discord_message("⚠️ IPアドレスの変更が検知されました。IPアドレスが元に戻るか、変化後のIPで安定するのを確認できるまで待機します。")
-                    last_ip = current_ip
-                    stable_time = 0
-                else:
-                    stable_time += check_interval
-
-                if stable_time >= target_stable_time:
-                    print(f"⏳ 新しいIP {last_ip} をマスターとして採用 (維持時間: {stable_time}秒)")
-                    notifier.send_discord_message(f"✅ 変更後のIPアドレス {last_ip} をマスターとして採用し、通常処理を続行します。")
-                    self.log_ip_change(self.initial_ip, last_ip, elapsed_time)
-                    self.initial_ip = last_ip  # 新しいIPをマスターにする
+                if not current_ip:
+                    print("⚠️ 現在のIPアドレス取得に失敗。再試行します...")
+                elif current_ip == self.initial_ip:
+                    if elapsed_time > 0:
+                        print("✅ IPアドレスが元に戻りました。通常処理を続行します。")
+                        notifier.send_discord_message("✅ IPアドレスが元に戻りました。通常処理を続行します。")
+                        self.log_ip_change(self.initial_ip, self.initial_ip, elapsed_time)
                     return
                 else:
-                    print(
-                        f"⚠️ IP変化: {self.initial_ip} → {current_ip} (維持時間: {stable_time}s / 目標: {target_stable_time}s)")
+                    if current_ip != last_ip:
+                        notifier.send_discord_message("⚠️ IPアドレスの変更が検知されました。IPアドレスが元に戻るか、変化後のIPで安定するのを確認できるまで待機します。")
+                        last_ip = current_ip
+                        stable_time = 0
+                    else:
+                        stable_time += check_interval
 
-            time.sleep(check_interval)
-            elapsed_time += check_interval
+                    if stable_time >= target_stable_time:
+                        print(f"⏳ 新しいIP {last_ip} をマスターとして採用 (維持時間: {stable_time}秒)")
+                        notifier.send_discord_message(f"✅ 変更後のIPアドレス {last_ip} をマスターとして採用し、通常処理を続行します。")
+                        self.log_ip_change(self.initial_ip, last_ip, elapsed_time)
+                        self.initial_ip = last_ip  # 新しいIPをマスターにする
+                        return
+                    else:
+                        print(
+                            f"⚠️ IP変化: {self.initial_ip} → {current_ip} (維持時間: {stable_time}s / 目標: {target_stable_time}s)")
 
-        print("⚠️ 最大待機時間を超えました。処理を継続します。")
-        notifier.send_discord_message(
-            "🚨 IPアドレス変更後の待機においてタイムアウトが発生しました。")
+                time.sleep(check_interval)
+                elapsed_time += check_interval
+
+            print("⚠️ 最大待機時間を超えました。処理を継続します。")
+            notifier.send_discord_message(
+                "🚨 IPアドレス変更後の待機においてタイムアウトが発生しました。")
 
     def log_ip_change(self, old_ip, new_ip, elapsed_time):
         """IP変更のログをドキュメントフォルダに保存する"""
