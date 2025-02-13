@@ -1306,8 +1306,8 @@ class Macro:
                 # 発動していないなら、アイドリング時間として加算する。アイドリング時間が一定基準を超えるとリセット発動。
                 if JumpHandler.jump_used:
                     idling_time = 0
-                    # 3秒に一回遷移が起こるとしたときに、1時間で休憩する確率が約20%になる調整
-                    if random.randint(1, 10000000) > 9998141:
+                    # 2秒に一回遷移が起こるとしたときに、1時間で休憩する確率が約20%になる調整
+                    if random.randint(1, 10000000) > 9998761:
                         rest_time = random.randint(300000, 700000) / 1000
                         print(f"約 {rest_time / 60:.2f} min の休憩に入ります。")
                         time.sleep(rest_time)
