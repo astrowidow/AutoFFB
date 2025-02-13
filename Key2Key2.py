@@ -18,7 +18,7 @@ notifier = Notifier()
 notifier.add_webhook("hook url")
 
 # 鎧集めなし、各種鉱石集め
-Macro.collect_material("manomori", collect_yoroi=False, collect_various_kouseki=True)
+Macro.collect_material("manomori", collect_yoroi=False, collect_various_kouseki=True, collect_iron=True)
 
 # # 鎧集めなし、白Only
 # Macro.collect_material("manomori", collect_yoroi=False, collect_various_kouseki=False)

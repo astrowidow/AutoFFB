@@ -578,9 +578,9 @@ class AccountInfo:
 
         # 各鉱石の最適値を計算（切り上げ）
         tiny_value = 0.5  # 白に対してピッタりの比率ではなく、少し余裕を持った数字にしておく。
-        self.optimal_mizu_num = math.ceil(6 * scale + tiny_value)
-        self.optimal_hi_num = math.ceil(3 * scale + tiny_value)
-        self.optimal_zya_num = math.ceil(3 * scale + tiny_value)
+        self.optimal_mizu_num = math.ceil(6 * scale + tiny_value) + 4
+        self.optimal_hi_num = math.ceil(3 * scale + tiny_value) + 2
+        self.optimal_zya_num = math.ceil(3 * scale + tiny_value) + 2
 
     def judge_kouseki_necessity(self, kouseki_type):
         """
@@ -784,14 +784,14 @@ class Action:
                 JumpManager.jump_to_status()
 
     @staticmethod
-    def go_to_sell_all_gomi_kouseki(collect_various_kouseki):
+    def go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron):
         Action.home()
         if ImageRecognizer.locate_center("auc"):
             JumpManager.jump_to_auction_from_status()
             pyautogui.press("end")
             time.sleep(0.5)
             JumpManager.jump_to_shuppin_select()
-            Action.sell_loop_all_gomi_kouseki(collect_various_kouseki)
+            Action.sell_loop_all_gomi_kouseki(collect_various_kouseki, collect_iron)
         Action.home()
 
     @staticmethod
@@ -840,7 +840,7 @@ class Action:
                 break
 
     @staticmethod
-    def sell_loop_all_gomi_kouseki(collect_various_kouseki):
+    def sell_loop_all_gomi_kouseki(collect_various_kouseki, collect_iron):
         forbidden_range = 4
         lower_limit_kouseki = 0
 
@@ -859,6 +859,7 @@ class Action:
             results_mizu = ImageRecognizer.locate_all("kouseki-mizu")
             results_hi = ImageRecognizer.locate_all("kouseki-hi")
             results_zya = ImageRecognizer.locate_all("kouseki-zya")
+            results_iron = ImageRecognizer.locate_all("kouseki-iron")
             results_radio = ImageRecognizer.locate_all("radio-button-2")
 
             if results_radio:
@@ -899,6 +900,14 @@ class Action:
                                 if account_info.judge_kouseki_necessity("zya"):
                                     click_ok = False
                                     break
+
+                    if collect_iron:
+                        for result_iron in results_iron:
+                            lower_limit_y = result_iron[1] - forbidden_range
+                            upper_limit_y = result_iron[1] + forbidden_range
+                            if lower_limit_y <= result_radio[1] <= upper_limit_y:
+                                click_ok = False
+                                break
 
                     if click_ok:
                         pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
@@ -1229,7 +1238,7 @@ class Macro:
         notifier.send_discord_message("🚨 プログラムを終了します。手動で原因調査と復帰を試みてください。")
 
     @staticmethod
-    def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool):
+    def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool, collect_iron: bool):
         atexit.register(Macro.on_exit)
         notifier = Notifier()
         vpn_manager = VpnManager()
@@ -1262,7 +1271,7 @@ class Macro:
 
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
-            Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki)
+            Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron)
             notifier.send_account_info()
 
             loop_num = random.randint(375, 524)
@@ -1413,11 +1422,12 @@ class ImageRecognizer:
         "anti-macro-02": {"filename": "anti-macro-02.png", "confidence": 0.9, "region": (5, 133, 340, 327)},
         "anti-macro-00": {"filename": "anti-macro-00.png", "confidence": 0.9, "region": (61, 110, 608, 669)},
         "radio-button-2": {"filename": "radio-button.png", "confidence": 0.9, "region": (313, 120, 1143, 905)},
-        "kouseki-shiro": {"filename": "shiro-2.png", "confidence": 0.7, "region": (377, 120, 1141, 913)},
-        "kouseki-mizu": {"filename": "mizu.png", "confidence": 0.7, "region": (334, 119, 1071, 914)},
-        "kouseki-hi": {"filename": "fire.png", "confidence": 0.7, "region": (293, 123, 1102, 909)},
-        "kouseki-zya": {"filename": "zya.png", "confidence": 0.7, "region": (437, 126, 920, 900)},
-        "kouseki": {"filename": "kouseki.png", "confidence": 0.85, "region": (322, 119, 1079, 913)},
+        "kouseki-shiro": {"filename": "shiro-2.png", "confidence": 0.7, "region": (377, 110, 1141, 913)},
+        "kouseki-iron": {"filename": "iron.png", "confidence": 0.7, "region": (377, 110, 1141, 913)},
+        "kouseki-mizu": {"filename": "mizu.png", "confidence": 0.7, "region": (334, 110, 1071, 914)},
+        "kouseki-hi": {"filename": "fire.png", "confidence": 0.7, "region": (293, 110, 1102, 909)},
+        "kouseki-zya": {"filename": "zya.png", "confidence": 0.7, "region": (293, 110, 1102, 900)},
+        "kouseki": {"filename": "kouseki.png", "confidence": 0.85, "region": (322, 110, 1079, 913)},
         "acu-shuppin": {"filename": "shuppin.png", "confidence": 0.75, "region": (760, 123, 848, 902)},
         "back-to-auc": {"filename": "back-to-auc.png", "confidence": 0.8, "region": (2, 125, 453, 801)},
         "keitai": {"filename": "keitai.png", "confidence": 0.9, "region": (1, 122, 788, 450)},
