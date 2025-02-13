@@ -92,12 +92,12 @@ class IPManager:
                 elif current_ip == self.initial_ip:
                     if elapsed_time > 0:
                         print("✅ IPアドレスが元に戻りました。通常処理を続行します。")
-                        notifier.send_discord_message("✅ IPアドレスが元に戻りました。通常処理を続行します。")
+                        # notifier.send_discord_message("✅ IPアドレスが元に戻りました。通常処理を続行します。")
                         self.log_ip_change(self.initial_ip, self.initial_ip, elapsed_time)
                     return
                 else:
                     if current_ip != last_ip:
-                        notifier.send_discord_message("⚠️ IPアドレスの変更が検知されました。IPアドレスが元に戻るか、変化後のIPで安定するのを確認できるまで待機します。")
+                        # notifier.send_discord_message("⚠️ IPアドレスの変更が検知されました。IPアドレスが元に戻るか、変化後のIPで安定するのを確認できるまで待機します。")
                         last_ip = current_ip
                         stable_time = 0
                     else:
@@ -105,7 +105,7 @@ class IPManager:
 
                     if stable_time >= target_stable_time:
                         print(f"⏳ 新しいIP {last_ip} をマスターとして採用 (維持時間: {stable_time}秒)")
-                        notifier.send_discord_message(f"✅ 変更後のIPアドレス {last_ip} をマスターとして採用し、通常処理を続行します。")
+                        # notifier.send_discord_message(f"✅ 変更後のIPアドレス {last_ip} をマスターとして採用し、通常処理を続行します。")
                         self.log_ip_change(self.initial_ip, last_ip, elapsed_time)
                         self.initial_ip = last_ip  # 新しいIPをマスターにする
                         return
@@ -1287,7 +1287,7 @@ class Macro:
         else:
             notifier.send_discord_message("⚠️ FFBオート周回マクロが開始されました。ログインシーケンスを開始します。")
             Action.reset(False)
-            notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
+            # notifier.send_discord_message("✅ ログインシーケンスが終了しました。オート周回を開始します。")
 
         # ここから周回開始
         while True:
@@ -1436,7 +1436,7 @@ class Macro:
                 time.sleep(1)
 
                 # 少し休んでから次のループで再度認証を試みる。
-                rest_time = 30  # min
+                rest_time = 5  # min
                 time.sleep(rest_time*60)
                 JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
 
