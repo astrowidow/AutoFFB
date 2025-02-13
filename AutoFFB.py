@@ -35,9 +35,11 @@ class IPManager:
 
     def __init__(self):
         if not hasattr(self, "initialized"):  # 初回だけ初期化
+            self.webdriver = self.initialize_driver()
             self.initial_ip = self.get_public_ip()
             self.pc_name = os.environ.get("COMPUTERNAME", "unknown")
             self.log_dir = self.get_log_directory()
+            # --------------------------------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
             if self.initial_ip:
@@ -49,6 +51,13 @@ class IPManager:
         self.initial_ip = self.get_public_ip()
 
     @staticmethod
+    def initialize_driver():
+        """Chromeドライバーを初期化し、再利用可能にする"""
+        options = Options()
+        options.debugger_address = "127.0.0.1:9222"  # 既存のChromeセッションに接続
+        return webdriver.Chrome(options=options)
+
+    @staticmethod
     def get_log_directory():
         base_doc_path = os.path.expanduser("~/Documents")
         if not os.path.exists(base_doc_path):
@@ -57,22 +66,12 @@ class IPManager:
         os.makedirs(log_dir, exist_ok=True)
         return log_dir
 
-    @staticmethod
-    def get_public_ip():
+    def get_public_ip(self):
         try:
-            options = Options()
-            options.debugger_address = "127.0.0.1:9222"  # 既存のChromeセッションに接続
-
-            # ✅ 既存の Chrome に接続するだけなので chromedriver を指定しない
-            driver = webdriver.Chrome(options=options)
-
-            driver.get("https://api64.ipify.org")
-
-            element = WebDriverWait(driver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
+            self.webdriver.get("https://api64.ipify.org")
+            element = WebDriverWait(self.webdriver, 5).until(EC.presence_of_element_located((By.TAG_NAME, "body")))
             ip = element.text.strip()
-
             return ip
-
         except Exception as e:
             print(f"⚠️ Chrome経由でのIP取得エラー: {e}")
             return ""
@@ -213,7 +212,7 @@ class JumpHandler:
 
             final_wait_time = time_after_confirmation
             if enable_adaptive_wait:
-                adaptive_wait_time = int(elapsed_time * 1200)
+                adaptive_wait_time = int(elapsed_time * 800)  # 秒からミリに換算。あまりに遷移に時間がかかるようならそれに応じた時間待つ。
                 final_wait_time = max(time_after_confirmation, adaptive_wait_time)
                 print(
                     f"遷移後待機時間: {final_wait_time} msec (基準: {time_after_confirmation} msec, 応答ベース: {adaptive_wait_time} msec)")
@@ -241,15 +240,15 @@ class JumpHandler:
 class JumpManager:
     @staticmethod
     def jump_to_champ():
-        JumpHandler("champ", "is-champ", time_after_confirmation_range=(849, 1536)).jump_with_confirmation()
+        JumpHandler("champ", "is-champ", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_bougu():
-        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(849, 1836)).jump_with_confirmation()
+        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_challenge_character():
-        JumpHandler("chara", "is-chara", time_after_confirmation_range=(549, 736)).jump_with_confirmation()
+        JumpHandler("chara", "is-chara", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_status():
@@ -257,30 +256,30 @@ class JumpManager:
 
     @staticmethod
     def jump_to_auction_from_status():
-        JumpHandler("auc", "is-auc", time_after_confirmation_range=(549, 1236)).jump_with_confirmation()
+        JumpHandler("auc", "is-auc", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_shuppin_result():
-        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
+        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_select():
-        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
+        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_result():
-        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(549, 1236)).jump_with_confirmation()
+        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_manomori():
-        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(549, 1336),
+        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(500, 1300),
                     offset_x=83).jump_with_confirmation()
 
     @staticmethod
     def jump_to_saishu():
-        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
-        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
-        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(549, 1336),
+        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(500, 1200)).jump_with_confirmation()
+        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(500, 1200)).jump_with_confirmation()
+        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(500, 1200),
                     offset_x=80).jump_with_confirmation()
 
     @staticmethod
@@ -295,9 +294,9 @@ class JumpManager:
     def jump_to_next_makyo(wait_key):
         jump_key = "manomori-win"
         if ImageRecognizer.locate_center(wait_key):
-            time_after_confirmation = (18549, 26636)
+            time_after_confirmation = (5549, 7636)
         else:
-            time_after_confirmation = (549, 1336)
+            time_after_confirmation = (500, 1200)
         JumpHandler(jump_key, wait_key, time_after_confirmation_range=time_after_confirmation).jump_with_confirmation()
 
     @staticmethod
@@ -1307,9 +1306,9 @@ class Macro:
                 # 発動していないなら、アイドリング時間として加算する。アイドリング時間が一定基準を超えるとリセット発動。
                 if JumpHandler.jump_used:
                     idling_time = 0
-                    # 5秒に一回遷移が起こるとしたときに、1時間で休憩する確率がちょうど1/2になる調整
-                    if random.randint(1, 10000000) > 9990378:
-                        rest_time = random.randint(1, 600000) / 1000
+                    # 3秒に一回遷移が起こるとしたときに、1時間で休憩する確率が約20%になる調整
+                    if random.randint(1, 10000000) > 9998141:
+                        rest_time = random.randint(300000, 700000) / 1000
                         print(f"約 {rest_time / 60:.2f} min の休憩に入ります。")
                         time.sleep(rest_time)
                         print(f"休憩終了。メインループに戻ります。")
