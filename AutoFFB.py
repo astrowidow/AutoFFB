@@ -1273,8 +1273,9 @@ class Macro:
             Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron)
             notifier.send_account_info()
 
-            loop_num = random.randint(375, 524)
-            for _ in range(loop_num):
+            grind_duration_sec = random.randint(3000, 7500)
+            grind_start_time = time.time()
+            while time.time() - grind_start_time < grind_duration_sec:
                 login_manager = LoginManager()
                 if login_manager.check_account_switch():
                     notifier.send_discord_message(
@@ -1286,6 +1287,7 @@ class Macro:
                         time.sleep(rest_time_min * 60)
                     Action.reset()
                     notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
+                    break
 
                 pyautogui.press("home")
                 time.sleep(0.5)
