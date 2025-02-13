@@ -598,11 +598,11 @@ class AccountInfo:
     def update_current_kouseki_num(self):
         if ImageRecognizer.locate_center("is-shuppin"):
             pyautogui.hotkey("ctrl", "u")
-            time.sleep(0.3)
+            time.sleep(0.5)
             pyautogui.hotkey("ctrl", "a")
-            time.sleep(0.1)
+            time.sleep(0.25)
             pyautogui.hotkey("ctrl", "c")
-            time.sleep(0.1)
+            time.sleep(0.25)
             pyautogui.hotkey("ctrl", "w")
             html_content = pyperclip.paste()
             kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
@@ -614,7 +614,6 @@ class AccountInfo:
 
     @staticmethod
     def parse_item_from_html(html_content, target_title):
-        # クリップボードからHTMLを取得
         soup = BeautifulSoup(html_content, 'lxml')
 
         # テーブルタイトルを探す
