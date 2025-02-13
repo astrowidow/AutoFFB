@@ -251,8 +251,11 @@ class JumpManager:
         JumpHandler("chara", "is-chara", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
-    def jump_to_status():
-        JumpHandler("to-status", "isStatus", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
+    def jump_to_status(react_keitai=True):
+        JumpHandler("to-status",
+                    "isStatus",
+                    time_after_confirmation_range=(549, 1536),
+                    react_keitai=react_keitai).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_status():
@@ -1412,7 +1415,7 @@ class Macro:
                 # HandleRecaptcha.capture_screenshot("after")
                 JumpManager.jump_to_madatuzukeru()
                 # HandleRecaptcha.capture_screenshot("negirai")
-                JumpManager.jump_to_status()
+                JumpManager.jump_to_status(react_keitai=False)
                 notifier.enable_message = True
 
             if ImageRecognizer.locate_center("isStatus"):
@@ -1425,8 +1428,12 @@ class Macro:
                     if should_notify:
                         notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
-                    notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:01")
-                    sys.exit()
+                    notifier.send_discord_message("⚠️ bot突破しようとしましたが、新規ウィンドウは突破できたものの、元ウィンドウでのリセット後にステータスに戻れませんでした。休憩後、再トライします。")
+                    # 少し休んでから次のループで再度認証を試みる。
+                    rest_time = 5  # min
+                    time.sleep(rest_time * 60)
+                    JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
+
             elif ImageRecognizer.locate_center("penalty"):
                 # 認証呼び出し過ぎでアカウントにペナルティがつくケース？
                 notifier.send_discord_message("⚠️ bot認証突破のための新規ページにてペナルティ発生。時間を開けて再トライします。")
