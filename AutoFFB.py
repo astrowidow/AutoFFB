@@ -414,6 +414,7 @@ class LoginManager:
             self.current_account = new_account
             self.notifier.b_notify_account = True
             self.account_info.last_keitai_time = time.time()
+            self.account_info.first_keitai_after_login = True
             self.penalty_counter.penalty_count = 0
             self.penalty_counter.last_penalty_time = time.time()
             return True
@@ -433,7 +434,7 @@ class Notifier:
         if not hasattr(self, "initialized"):  # 初回だけ初期化
             self.webhook_url = ""
             self.enable_message = True
-            self.ok_post_interval = 3*60*60  # 3時間
+            self.ok_post_interval = (3.5*60)*60  # 3時間半
             self.last_post_time = time.time()
             self.account_info = AccountInfo()
             self.b_notify_account = True
@@ -470,7 +471,7 @@ class Notifier:
             else:
                 print(f"⚠️ discordメッセージ送信エラー: {response.status_code}")
                 print(response.text)
-        self.last_post_time = time.time()
+            self.last_post_time = time.time()
 
     def send_discord_image(self, image_path: str, caption: str = ""):
         """
@@ -493,7 +494,7 @@ class Notifier:
             else:
                 rslt_str = f"⚠️ Discordへの画像ポストでエラーが発生しました。: {response.status_code}\n" + response.text
                 self.send_discord_message(rslt_str)
-        self.last_post_time = time.time()
+            self.last_post_time = time.time()
 
     def send_ok_post(self):
         if time.time() - self.last_post_time > self.ok_post_interval:
@@ -541,7 +542,7 @@ class PenaltyCounter:
             if self.penalty_count <= 5:
                 notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、{dangerous_interval}時間以内に連鎖した警告数は {self.penalty_count}回です。")
                 time.sleep(30)
-                Action.reset()
+                Action.reset(False)
             else:
                 notifier.send_discord_message(f"🚨 {dangerous_interval}時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。")
                 sys.exit()
@@ -586,6 +587,7 @@ class AccountInfo:
             self.optimal_hi_num = 0
             self.optimal_zya_num = 0
             self.last_keitai_time = time.time()
+            self.first_keitai_after_login = True
             # ----------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
@@ -669,7 +671,7 @@ class AccountInfo:
 
 class Action:
     @staticmethod
-    def reset(show_message=True):
+    def reset(show_message=False):
         notifier = Notifier()
         if show_message:
             notifier.send_discord_message("⚠️ リセットシーケンスが開始されました。")
@@ -1309,8 +1311,7 @@ class Macro:
                         notifier.send_discord_message(
                             f"⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために{rest_time_min}分スリープします。")
                         time.sleep(rest_time_min * 60)
-                    Action.reset()
-                    notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
+                    Action.reset(False)
                     break
 
                 pyautogui.press("home")
@@ -1345,7 +1346,7 @@ class Macro:
                 idling_thresh = 5  # min
                 if idling_time > 60*idling_thresh:
                     notifier.send_discord_message(f"⚠️ 突っかかっているみたいで、ページ遷移が{idling_thresh}分間行われていません。一度ログインし直します。")
-                    Action.reset()
+                    Action.reset(True)
 
                 notifier.send_ok_post()
 
@@ -1375,11 +1376,21 @@ class Macro:
     def hundle_keitai_denwa():
         if ImageRecognizer.locate_center("keitai"):
             account_info = AccountInfo()
-            keitai_interval_min = (time.time() - account_info.last_keitai_time)/60
+
+            should_notify = False
+            keitai_interval_min = 0
+            if account_info.first_keitai_after_login:
+                account_info.first_keitai_after_login = False
+            else:
+                keitai_interval_min = (time.time() - account_info.last_keitai_time)/60
+                if keitai_interval_min < 30:
+                    should_notify = True
+
             account_info.last_keitai_time = time.time()
             notifier = Notifier()
-            notifier.send_discord_message(f"⚠️ bot検知ページに遷移しました。認証突破を試みます。\n"
-                                          f"インターバル: {keitai_interval_min} min")
+            if should_notify:
+                notifier.send_discord_message(f"⚠️ bot検知ページに遷移しました。認証突破を試みます。\n"
+                                              f"インターバル: {keitai_interval_min} min")
 
             # まずは怪しくないChromeセッションを立ち上げる
             HandleRecaptcha.login_another_window()
@@ -1411,7 +1422,8 @@ class Macro:
                 # debugモードのChromeの方でアカウントにログインし直して、認証突破扱いになるはず。
                 Action.reset(show_message=False)
                 if ImageRecognizer.locate_center("isStatus"):
-                    notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
+                    if should_notify:
+                        notifier.send_discord_message("✅ bot検知ページの認証突破に成功しステータス画面に遷移しました。")
                 else:
                     notifier.send_discord_message("🚨 bot検知ページの認証突破に失敗しました。code:01")
                     sys.exit()
