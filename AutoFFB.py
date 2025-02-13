@@ -715,7 +715,7 @@ class Action:
                 ip_manager.reset_ip()
             JumpManager.jump_to_login_button()
 
-            start_time = 0
+            start_time = time.time()
             max_transition_time = 60  # sec
             check_interval = 1  # sec
             while True:
@@ -727,8 +727,8 @@ class Action:
                 if ImageRecognizer.locate_center("keitai"):
                     try_again = False
                     break
-                if time.time() - start_time < max_transition_time:
-                    rest_min = 10
+                if time.time() - start_time > max_transition_time:
+                    rest_min = 5
                     print(f"ログインし直しましたが、ステータス画面への遷移ができません。{rest_min}分の休憩後、もう一度ログイントライしてみます。")
                     try_again = True
                     time.sleep(rest_min*60)
