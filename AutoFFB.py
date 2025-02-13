@@ -1424,7 +1424,7 @@ class ImageRecognizer:
         "anti-macro-00": {"filename": "anti-macro-00.png", "confidence": 0.9, "region": (61, 110, 608, 669)},
         "radio-button-2": {"filename": "radio-button.png", "confidence": 0.9, "region": (313, 120, 1143, 905)},
         "kouseki-shiro": {"filename": "shiro-2.png", "confidence": 0.7, "region": (377, 110, 1141, 913)},
-        "kouseki-iron": {"filename": "iron.png", "confidence": 0.7, "region": (377, 110, 1141, 913)},
+        "kouseki-iron": {"filename": "iron.png", "confidence": 0.85, "region": (377, 110, 1141, 913)},  # サファイアと誤認識するため、しきい値高めにする
         "kouseki-mizu": {"filename": "mizu.png", "confidence": 0.7, "region": (334, 110, 1071, 914)},
         "kouseki-hi": {"filename": "fire.png", "confidence": 0.7, "region": (293, 110, 1102, 909)},
         "kouseki-zya": {"filename": "zya.png", "confidence": 0.7, "region": (293, 110, 1102, 900)},
