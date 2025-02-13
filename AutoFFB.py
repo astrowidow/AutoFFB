@@ -318,8 +318,8 @@ class JumpManager:
     def jump_to_vpn_switch_to_turn_on():
         vpn_manager = VpnManager()
         if vpn_manager.use_vpn:
-            print("VPNスイッチをONにします。")
             if ImageRecognizer.locate_center("vpn-invalid"):
+                print("VPNスイッチをONにします。")
                 JumpHandler("vpn-off-state", "vpn-on-state", time_after_confirmation_range=(3049, 5336),
                             react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
         else:
@@ -327,14 +327,36 @@ class JumpManager:
 
     @staticmethod
     def jump_to_vpn_switch_to_turn_off():
-        print("VPNスイッチをOFFにします。")
         if ImageRecognizer.locate_center("vpn-on-state"):
             if not ImageRecognizer.locate_center("vpn-invalid"):
-                JumpHandler("vpn-on-state", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
-                            react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+                # JumpHandler("vpn-on-state", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
+                #             react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
                 # if ImageRecognizer.locate_center("ad-close"):
                 #     JumpHandler("ad-close", "vpn-off-state", time_after_confirmation_range=(3049, 5336),
                 #                 react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
+                print("VPNスイッチをOFFにします。")
+                jump_key = "vpn-on-state"
+                wait_key = "vpn-off-state"
+                wait_key_alias = "ad-close"
+                time_after_key_down = 20
+                time_after_confirmation = random.randint(3049, 5336)
+                location = ImageRecognizer.locate_center(jump_key)
+                if location:
+                    print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
+                    target_x = location[0]
+                    target_y = location[1]
+                    pyautogui.moveTo(target_x, target_y, 0.2)
+                    pyautogui.click(target_x, target_y, duration=time_after_key_down / 1000)
+
+                    print(f"ページ遷移待ち処理開始 from:{jump_key} to:{wait_key}")
+                    transition_timeout = 10
+                    start_time = time.time()
+                    while time.time() - start_time < transition_timeout:
+                        if ImageRecognizer.locate_center(wait_key) or ImageRecognizer.locate_center(wait_key_alias):
+                            break
+                        time.sleep(0.2)
+                    print(f"ページ遷移処理完了")
+                    time.sleep(time_after_confirmation / 1000)
 
     @staticmethod
     def jump_to_ffb_top_page():
@@ -368,6 +390,7 @@ class LoginManager:
             self.current_account = {}
             self.notifier = Notifier()
             self.account_info = AccountInfo()
+            self.penalty_counter = PenaltyCounter()
             # -----------------------------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
@@ -391,6 +414,8 @@ class LoginManager:
             self.current_account = new_account
             self.notifier.b_notify_account = True
             self.account_info.last_keitai_time = time.time()
+            self.penalty_counter.penalty_count = 0
+            self.penalty_counter.last_penalty_time = time.time()
             return True
         else:
             return False
@@ -456,14 +481,14 @@ class Notifier:
         if self.enable_message:
             full_caption = self.generate_prefix()
             if caption:
-                full_caption += "---------------------------------------------\n" + caption + "---------------------------------------------\n"
+                full_caption += "---------------------------------------------\n" + caption + "\n---------------------------------------------\n"
 
             with open(image_path, "rb") as image_file:
                 files = {"file": image_file}
                 data = {"content": full_caption}
                 response = requests.post(self.webhook_url, data=data, files=files)
 
-            if response.status_code == 204:
+            if response.status_code in [200, 204]:  # 200も成功と判定
                 print("✅ 画像送信成功！")
             else:
                 rslt_str = f"⚠️ Discordへの画像ポストでエラーが発生しました。: {response.status_code}\n" + response.text
@@ -1457,7 +1482,7 @@ class ImageRecognizer:
         "go-to-shuppin": {"filename": "to-shuppin.png", "confidence": 0.8, "region": (1, 127, 618, 900)},
         "bougu-ya": {"filename": "bougu-ya.png", "confidence": 0.8, "region": (2, 123, 1205, 738)},
         "is-bougu-ya": {"filename": "is-bougu-ya.png", "confidence": 0.8, "region": (1, 126, 1063, 891)},
-        "ad-close": {"filename": "ad-close.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
+        "ad-close": {"filename": "ad-close.png", "confidence": 0.8, "region": (1014, 40, 886, 764)},
         "vpn-icon-on": {"filename": "vpn-icon-on.png", "confidence": 0.8, "region": (607, 1, 1307, 300)},
         "vpn-icon-off": {"filename": "vpn-icon-off.png", "confidence": 0.8, "region": (607, 1, 1307, 300)},
         "vpn-window": {"filename": "vpn-window.png", "confidence": 0.8, "region": (1014, 1, 886, 764)},
