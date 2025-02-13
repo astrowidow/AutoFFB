@@ -212,7 +212,7 @@ class JumpHandler:
 
             final_wait_time = time_after_confirmation
             if enable_adaptive_wait:
-                adaptive_wait_time = int(elapsed_time * 800)  # 秒からミリに換算。あまりに遷移に時間がかかるようならそれに応じた時間待つ。
+                adaptive_wait_time = int(elapsed_time * 600)  # 秒からミリに換算。変換係数 0.6。
                 final_wait_time = max(time_after_confirmation, adaptive_wait_time)
                 print(
                     f"遷移後待機時間: {final_wait_time} msec (基準: {time_after_confirmation} msec, 応答ベース: {adaptive_wait_time} msec)")
