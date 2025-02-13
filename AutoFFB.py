@@ -933,7 +933,8 @@ class Action:
                         for result_iron in results_iron:
                             lower_limit_y = result_iron[1] - forbidden_range
                             upper_limit_y = result_iron[1] + forbidden_range
-                            if lower_limit_y <= result_radio[1] <= upper_limit_y:
+                            if (lower_limit_y <= result_radio[1] <= upper_limit_y
+                                    and ImageRecognizer.judge_desired_iron(result_iron)):
                                 click_ok = False
                                 break
 
@@ -1512,9 +1513,16 @@ class ImageRecognizer:
         "ffb-login": {"filename": "ffb-login.png", "confidence": 0.8, "region": (516, 1, 1905, 502)},
         "penalty": {"filename": "penalty.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
         "rest-kankoku": {"filename": "rest-kankoku.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
+        "iron-10000": {"filename": "iron-10000.png", "confidence": 0.8, "region": (350, 1, 1000, 1)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
+
+    @staticmethod
+    def judge_desired_iron(location):
+        search_region = (int(location[0]), int(math.floor(location[1] + 0.5) - 20), int(1000), int(40))
+        ImageRecognizer.IMAGE_PARAMS["iron-10000"]["region"] = search_region
+        return ImageRecognizer.locate_center("iron-10000")
 
     @staticmethod
     def locate_center(key):
