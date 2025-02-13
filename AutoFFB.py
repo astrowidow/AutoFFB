@@ -171,7 +171,8 @@ class JumpHandler:
 
         notifier = Notifier()
         if reason == "Timeout":
-            notifier.send_discord_message("🚨 ページ遷移でタイムアウトが発生しました")
+            file_path = HandleRecaptcha.capture_screenshot("timeout")
+            notifier.send_discord_image(file_path, "🚨 ページ遷移でタイムアウトが発生しました")
 
         if reason == "ErrorInterrupt":
             notifier.send_discord_message("⚠️ エラーページが表示されました。ステータス画面への遷移を試みます。")
@@ -240,11 +241,11 @@ class JumpHandler:
 class JumpManager:
     @staticmethod
     def jump_to_champ():
-        JumpHandler("champ", "is-champ", time_after_confirmation_range=(2049, 2536)).jump_with_confirmation()
+        JumpHandler("champ", "is-champ", time_after_confirmation_range=(849, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_bougu():
-        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(1249, 1836)).jump_with_confirmation()
+        JumpHandler("bougu-ya", "is-bougu-ya", time_after_confirmation_range=(849, 1836)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_challenge_character():
@@ -252,34 +253,34 @@ class JumpManager:
 
     @staticmethod
     def jump_to_status():
-        JumpHandler("to-status", "isStatus", time_after_confirmation_range=(1549, 3236)).jump_with_confirmation()
+        JumpHandler("to-status", "isStatus", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_status():
-        JumpHandler("auc", "is-auc", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
+        JumpHandler("auc", "is-auc", time_after_confirmation_range=(549, 1236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_auction_from_shuppin_result():
-        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
+        JumpHandler("back-to-auc", "is-auc", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_select():
-        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(1249, 1536)).jump_with_confirmation()
+        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_result():
-        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(1549, 2236)).jump_with_confirmation()
+        JumpHandler("acu-shuppin", "shuppin-done", time_after_confirmation_range=(549, 1236)).jump_with_confirmation()
 
     @staticmethod
     def jump_to_manomori():
-        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(2149, 2336),
+        JumpHandler("go-to-manomori", "in-manomori", time_after_confirmation_range=(549, 1336),
                     offset_x=83).jump_with_confirmation()
 
     @staticmethod
     def jump_to_saishu():
-        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(1049, 1536)).jump_with_confirmation()
-        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(1049, 1536)).jump_with_confirmation()
-        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(2149, 2336),
+        JumpHandler("go-to-manomori", "go-to-last", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
+        JumpHandler("go-to-last", "go-to-last", time_after_confirmation_range=(549, 1336)).jump_with_confirmation()
+        JumpHandler("go-to-last", "in-last", time_after_confirmation_range=(549, 1336),
                     offset_x=80).jump_with_confirmation()
 
     @staticmethod
@@ -296,7 +297,7 @@ class JumpManager:
         if ImageRecognizer.locate_center(wait_key):
             time_after_confirmation = (18549, 26636)
         else:
-            time_after_confirmation = (2149, 2336)
+            time_after_confirmation = (549, 1336)
         JumpHandler(jump_key, wait_key, time_after_confirmation_range=time_after_confirmation).jump_with_confirmation()
 
     @staticmethod
@@ -308,10 +309,10 @@ class JumpManager:
     def jump_to_vpn_setting():
         print("VPN設定メニューを開きます。")
         if ImageRecognizer.locate_center("vpn-icon-on"):
-            JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(2049, 2136),
+            JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(1049, 1136),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
         elif ImageRecognizer.locate_center("vpn-icon-off"):
-            JumpHandler("vpn-icon-off", "vpn-window", time_after_confirmation_range=(2049, 2136),
+            JumpHandler("vpn-icon-off", "vpn-window", time_after_confirmation_range=(1049, 1136),
                         react_keitai=False, enable_adaptive_wait=True, react_error=False).jump_with_confirmation()
 
     @staticmethod
@@ -466,8 +467,8 @@ class Notifier:
             if response.status_code == 204:
                 print("✅ 画像送信成功！")
             else:
-                print(f"⚠️ エラー: {response.status_code}")
-                print(response.text)
+                rslt_str = f"⚠️ Discordへの画像ポストでエラーが発生しました。: {response.status_code}\n" + response.text
+                self.send_discord_message(rslt_str)
         self.last_post_time = time.time()
 
     def send_ok_post(self):
@@ -1130,6 +1131,7 @@ class HandleRecaptcha:
 
         screenshot.save(file_path)
         print(f"📸 スクリーンショットを保存しました: {file_path}")
+        return file_path
 
     @classmethod
     def generate_path(cls, start, end):
@@ -1255,16 +1257,6 @@ class Macro:
 
         # ここから周回開始
         while True:
-            login_manager = LoginManager()
-            if login_manager.check_account_switch():
-                notifier.send_discord_message("⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
-                if not vpn_manager.use_vpn:
-                    rest_time_min = 30
-                    notifier.send_discord_message(f"⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために{rest_time_min}分スリープします。")
-                    time.sleep(rest_time_min * 60)
-                Action.reset()
-                notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
-
             Action.home()
             pyautogui.press("esc")
 
@@ -1273,8 +1265,20 @@ class Macro:
             Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki)
             notifier.send_account_info()
 
-            loop_num = random.randint(375, 854)
+            loop_num = random.randint(375, 524)
             for _ in range(loop_num):
+                login_manager = LoginManager()
+                if login_manager.check_account_switch():
+                    notifier.send_discord_message(
+                        "⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
+                    if not vpn_manager.use_vpn:
+                        rest_time_min = 30
+                        notifier.send_discord_message(
+                            f"⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために{rest_time_min}分スリープします。")
+                        time.sleep(rest_time_min * 60)
+                    Action.reset()
+                    notifier.send_discord_message("✅ アカウント切り替えが正常に終了しました。周回を開始します。")
+
                 pyautogui.press("home")
                 time.sleep(0.5)
 
@@ -1294,7 +1298,8 @@ class Macro:
                 # 発動していないなら、アイドリング時間として加算する。アイドリング時間が一定基準を超えるとリセット発動。
                 if JumpHandler.jump_used:
                     idling_time = 0
-                    if random.randint(1, 1000) > 995:
+                    # 5秒に一回遷移が起こるとしたときに、1時間で休憩する確率がちょうど1/2になる調整
+                    if random.randint(1, 10000000) > 9990378:
                         rest_time = random.randint(1, 600000) / 1000
                         print(f"約 {rest_time / 60:.2f} min の休憩に入ります。")
                         time.sleep(rest_time)
