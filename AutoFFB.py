@@ -156,9 +156,14 @@ class JumpHandler:
         self.enable_adaptive_wait = enable_adaptive_wait
         self.transition_timeout = 60
         self.ip_manager = IPManager()  # シングルトンを参照
+        self.penalty_counter = PenaltyCounter()
 
     def jump_with_confirmation(self):
-        time_after_confirmation = random.randint(*self.time_after_confirmation_range)  # 実行時に乱数適用
+        lower_limit = self.time_after_confirmation_range[0] + self.penalty_counter.penalty_wait_offset_lower_limit_msec
+        upper_limit = self.time_after_confirmation_range[1] + self.penalty_counter.penalty_wait_offset_upper_limit_msec
+        if lower_limit > upper_limit:
+            upper_limit = lower_limit + 100
+        time_after_confirmation = random.randint(lower_limit, upper_limit)  # 実行時に乱数適用
         reason = self.jump_with_confirmation_core(
             jump_key=self.jump_key, wait_key=self.wait_key,
             time_after_key_down=self.time_after_key_down,
@@ -309,6 +314,7 @@ class JumpManager:
 
     @staticmethod
     def jump_to_vpn_setting():
+        pyautogui.press("esc")
         print("VPN設定メニューを開きます。")
         if ImageRecognizer.locate_center("vpn-icon-on"):
             JumpHandler("vpn-icon-on", "vpn-window", time_after_confirmation_range=(1049, 1136),
@@ -419,10 +425,31 @@ class LoginManager:
             self.account_info.last_keitai_time = time.time()
             self.account_info.first_keitai_after_login = True
             self.penalty_counter.penalty_count = 0
-            self.penalty_counter.last_penalty_time = time.time()
+            self.penalty_counter.penalty_wait_offset_lower_limit_msec = 0
+            self.penalty_counter.penalty_wait_offset_upper_limit_msec = 0
             return True
         else:
             return False
+
+    def get_seconds_until_next_switch(self):
+        """次のアカウント切り替え時刻までの秒数を取得"""
+        now = datetime.datetime.now()
+        now_time_str = now.strftime("%H:%M")
+
+        # 次の切り替え時刻を探す
+        for t in self.switch_times:
+            if t > now_time_str:
+                next_switch = datetime.datetime.strptime(t, "%H:%M").replace(
+                    year=now.year, month=now.month, day=now.day
+                )
+                break
+        else:
+            # すべての時刻が現在より前なら、最初の時刻を翌日に設定
+            next_switch = datetime.datetime.strptime(self.switch_times[0], "%H:%M").replace(
+                year=now.year, month=now.month, day=now.day
+            ) + datetime.timedelta(days=1)
+
+        return int((next_switch - now).total_seconds())
 
 
 class Notifier:
@@ -529,25 +556,40 @@ class PenaltyCounter:
     def __init__(self):
         if not hasattr(self, "initialized"):  # 初回だけ初期化
             self.penalty_count = 0
-            self.last_penalty_time = time.time()
+            self.penalty_wait_offset_upper_limit_msec = 0
+            self.penalty_wait_offset_lower_limit_msec = 0
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def check_penalty(self):
-        dangerous_interval = 5  # hours
         if ImageRecognizer.locate_center("penalty"):
-            if time.time() - self.last_penalty_time > dangerous_interval*3600:
-                self.penalty_count = 1
-            else:
-                self.penalty_count += 1
-            self.last_penalty_time = time.time()
+            # 回数間違えるのが嫌なので慎重に待つ。
+            # オークションの鉱石カウントで、急ぎすぎると読み込み切れてない状態でコピペが行われて、カウントミスが生じた。
+            pyautogui.hotkey("ctrl", "u")
+            time.sleep(2)
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(2)
+            pyautogui.hotkey("ctrl", "c")
+            time.sleep(2)
+            pyautogui.hotkey("ctrl", "w")
+            html_content = pyperclip.paste()
+            self.penalty_count = AccountInfo.parse_penalty_count(html_content)
+            self.penalty_wait_offset_lower_limit_msec = max(0, self.penalty_count*100 - 100)
+            self.penalty_wait_offset_upper_limit_msec = max(0, self.penalty_count*400 - 800)
 
             notifier = Notifier()
-            if self.penalty_count <= 5:
-                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、{dangerous_interval}時間以内に連鎖した警告数は {self.penalty_count}回です。")
+            if self.penalty_count < 8:
+                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。")
                 time.sleep(30)
                 Action.reset(False)
+            elif self.penalty_count == 8:
+                login_manager = LoginManager()
+                wait_duration_sec = login_manager.get_seconds_until_next_switch() + 15*60  # 境界値考慮して15分足す
+                wait_duration_sec = wait_duration_sec % 6*60*60  # 6時間以上待つ必要はないので、あまりに長いようなら丸める。
+                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。\n"
+                                              f"安全のため、次のアカウント切り替え時刻まで{wait_duration_sec/60}minスリープします。")
+                JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
             else:
-                notifier.send_discord_message(f"🚨 {dangerous_interval}時間以内に連鎖したペナルティ警告数が {self.penalty_count}回になりました。")
+                notifier.send_discord_message(f"🚨 ペナルティ警告数が {self.penalty_count}回になりました。")
                 sys.exit()
 
 
@@ -628,11 +670,11 @@ class AccountInfo:
     def update_current_kouseki_num(self):
         if ImageRecognizer.locate_center("is-shuppin"):
             pyautogui.hotkey("ctrl", "u")
-            time.sleep(0.5)
+            time.sleep(0.6)
             pyautogui.hotkey("ctrl", "a")
-            time.sleep(0.25)
+            time.sleep(0.5)
             pyautogui.hotkey("ctrl", "c")
-            time.sleep(0.25)
+            time.sleep(0.4)
             pyautogui.hotkey("ctrl", "w")
             html_content = pyperclip.paste()
             kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
@@ -641,6 +683,17 @@ class AccountInfo:
             self.zya_num = kouseki_counter["邪のオブシダン"]
             self.shiro_num = kouseki_counter["白マテリア"]
             self.calc_optimal_kouseki_ratio()
+
+    @staticmethod
+    def parse_penalty_count(html_content):
+        soup = BeautifulSoup(html_content, 'lxml')
+
+        # ペナルティ数の文字列を探す
+        for line in soup.stripped_strings:
+            if "現在の累計検知数" in line:
+                count = line.split(':')[-1].strip()
+                return int(count)
+        return None  # 見つからなかった場合
 
     @staticmethod
     def parse_item_from_html(html_content, target_title):
@@ -1314,6 +1367,9 @@ class Macro:
                         rest_time_min = 30
                         notifier.send_discord_message(
                             f"⚠️ VPNを使用しない設定になっているため、ログイン情報リセットのために{rest_time_min}分スリープします。")
+                        # 念の為トップページに戻って完全ログアウトしておく。
+                        pyautogui.press("esc")
+                        JumpManager.jump_to_ffb_top_page()
                         time.sleep(rest_time_min * 60)
                     Action.reset(False)
                     break
