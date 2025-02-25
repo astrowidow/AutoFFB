@@ -144,7 +144,8 @@ class JumpHandler:
     jump_used = False
 
     def __init__(self, jump_key, wait_key, time_after_key_down=20, time_after_confirmation_range=(5000, 10000),
-                 offset_x=0, offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True):
+                 offset_x=0, offset_y=0, react_keitai=True,
+                 enable_adaptive_wait=True, react_error=True, other_wait_key_list=None):
         self.jump_key = jump_key
         self.wait_key = wait_key
         self.time_after_key_down = time_after_key_down
@@ -157,6 +158,7 @@ class JumpHandler:
         self.transition_timeout = 60
         self.ip_manager = IPManager()  # シングルトンを参照
         self.penalty_counter = PenaltyCounter()
+        self.other_wait_key_list = other_wait_key_list
 
     def jump_with_confirmation(self):
         lower_limit = self.time_after_confirmation_range[0] + self.penalty_counter.penalty_wait_offset_lower_limit_msec
@@ -170,13 +172,14 @@ class JumpHandler:
             time_after_confirmation=time_after_confirmation,
             offset_x=self.offset_x, offset_y=self.offset_y,
             react_keitai=self.react_keitai, enable_adaptive_wait=self.enable_adaptive_wait,
-            react_error=self.react_error
+            react_error=self.react_error,
+            other_wait_key_list=self.other_wait_key_list
         )
 
         notifier = Notifier()
         if reason == "Timeout":
             file_path = HandleRecaptcha.capture_screenshot("timeout")
-            notifier.send_discord_image(file_path, "🚨 ページ遷移でタイムアウトが発生しました")
+            notifier.send_discord_image(file_path, "⚠️ ページ遷移でタイムアウトが発生しました")
 
         if reason == "ErrorInterrupt":
             notifier.send_discord_message("⚠️ エラーページが表示されました。ステータス画面への遷移を試みます。")
@@ -196,7 +199,8 @@ class JumpHandler:
         JumpHandler.jump_used = True
 
     def jump_with_confirmation_core(self, jump_key, wait_key, time_after_key_down, time_after_confirmation, offset_x=0,
-                                    offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True):
+                                    offset_y=0, react_keitai=True, enable_adaptive_wait=True, react_error=True,
+                                    other_wait_key_list=None):
         location = ImageRecognizer.locate_center(jump_key)
         if location:
             print(f"id: {jump_key}, x: {location[0]}, y: {location[1]}")
@@ -211,7 +215,8 @@ class JumpHandler:
             elapsed_time, reason = self.wait_for_transition(
                 wait_key=wait_key,
                 react_keitai=react_keitai,
-                react_error=react_error
+                react_error=react_error,
+                other_wait_key_list=other_wait_key_list
             )
             print(f"ページ遷移処理完了: {elapsed_time} 秒, 終了理由: {reason}")
 
@@ -227,7 +232,10 @@ class JumpHandler:
         else:
             return "ButtonNotFound"
 
-    def wait_for_transition(self, wait_key, react_keitai=True, react_error=True, waiting_interval=200):
+    def wait_for_transition(self, wait_key, react_keitai=True, react_error=True,
+                            waiting_interval=200, other_wait_key_list=None):
+        if other_wait_key_list is None:
+            other_wait_key_list = []
         start_time = time.time()
         while time.time() - start_time < self.transition_timeout:
             if ImageRecognizer.locate_center(wait_key):
@@ -238,6 +246,10 @@ class JumpHandler:
             elif ImageRecognizer.locate_center("error"):
                 if react_error:
                     return time.time() - start_time, "ErrorInterrupt"
+            elif other_wait_key_list:
+                for other_wait_key in other_wait_key_list:
+                    if ImageRecognizer.locate_center(other_wait_key):
+                        return time.time() - start_time, "PageTransition"
             time.sleep(waiting_interval / 1000)
         return self.transition_timeout, "Timeout"
 
@@ -272,7 +284,8 @@ class JumpManager:
 
     @staticmethod
     def jump_to_shuppin_select():
-        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
+        JumpHandler("go-to-shuppin", "is-shuppin", time_after_confirmation_range=(549, 1536),
+                    other_wait_key_list=["is-shuppin2"]).jump_with_confirmation()
 
     @staticmethod
     def jump_to_shuppin_result():
@@ -386,6 +399,16 @@ class JumpManager:
 class LoginManager:
     _instance = None
 
+    class Options:
+        def __init__(self):
+            collect_mode = "saishu"
+            collect_yoroi = False
+            collect_various_kouseki = False
+            collect_iron = False
+            send_kouseki = False
+            send_id = "xxxxxxxx"
+            auto_buy = False
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(LoginManager, cls).__new__(cls)
@@ -403,9 +426,9 @@ class LoginManager:
             # -----------------------------------------------------------------------------
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
-    def add_account(self, switch_time, user_id, password):
+    def add_account(self, switch_time, user_id, password, options=Options()):
         """アカウント情報を追加"""
-        self.account_table[switch_time] = {"id": user_id, "password": password}
+        self.account_table[switch_time] = {"id": user_id, "password": password, "options": options}
         self.switch_times = sorted(self.account_table.keys())
         self.current_account = self.get_current_account()
 
@@ -876,11 +899,42 @@ class Action:
         Action.home()
 
     @staticmethod
+    def go_to_send_all_rare_kouseki():
+        Action.home()
+        if ImageRecognizer.locate_center("auc"):
+            JumpManager.jump_to_auction_from_status()
+            pyautogui.press("end")
+            time.sleep(0.5)
+            JumpManager.jump_to_shuppin_select()
+            Action.send_loop_all_rare_kouseki()
+        Action.home()
+
+    @staticmethod
+    def go_to_buy_all_rare_kouseki():
+        Action.home()
+        if ImageRecognizer.locate_center("auc"):
+            JumpManager.jump_to_auction_from_status()
+            Action.buy_loop_all_rare_kouseki()
+        Action.home()
+
+    @staticmethod
     def go_to_sell_all_gomi_yoroi():
         Action.home()
         if ImageRecognizer.locate_center("bougu-ya"):
             JumpManager.jump_to_bougu()
             Action.sell_loop_all_gomi_yoroi()
+        Action.home()
+
+    @staticmethod
+    def go_to_update_kouseki_num():
+        Action.home()
+        if ImageRecognizer.locate_center("auc"):
+            JumpManager.jump_to_auction_from_status()
+            pyautogui.press("end")
+            time.sleep(0.5)
+            JumpManager.jump_to_shuppin_select()
+            account_info = AccountInfo()
+            account_info.update_current_kouseki_num()
         Action.home()
 
     @staticmethod
@@ -923,7 +977,6 @@ class Action:
     @staticmethod
     def sell_loop_all_gomi_kouseki(collect_various_kouseki, collect_iron):
         forbidden_range = 4
-        lower_limit_kouseki = 0
 
         while True:
             account_info = AccountInfo()
@@ -933,6 +986,7 @@ class Action:
             pyautogui.press("end")
             time.sleep(0.5)
 
+            lower_limit_kouseki = 0
             result_kouseki = ImageRecognizer.locate_center("kouseki")
             if result_kouseki:
                 lower_limit_kouseki = result_kouseki[1]
@@ -1009,16 +1063,13 @@ class Action:
                 break
 
     @staticmethod
-    def send_rare_kouseki():
+    def send_loop_all_rare_kouseki():
         raw_range = 4
 
-        Action.home()
-        JumpManager.jump_to_auction_from_status()
-        pyautogui.press("end")
-        time.sleep(0.5)
-        JumpManager.jump_to_shuppin_select()
-
         while True:
+            account_info = AccountInfo()
+            account_info.update_current_kouseki_num()
+
             pyautogui.press("end")
             time.sleep(0.5)
             results_shiro = ImageRecognizer.locate_all("kouseki-shiro")
@@ -1031,11 +1082,13 @@ class Action:
                 click_ok = False
                 is_shiro = False
                 for result_radio in results_radio:
-                    for result in results_shiro:
-                        if result[1] - raw_range <= result_radio[1] <= result[1] + raw_range:
-                            click_ok = True
-                            is_shiro = True
-                            break
+                    if account_info.shiro_num > 1:
+                        # 白が一個以上ないとおかしな動きになるので、白は２個以上あるときのみ送信
+                        for result in results_shiro:
+                            if result[1] - raw_range <= result_radio[1] <= result[1] + raw_range:
+                                click_ok = True
+                                is_shiro = True
+                                break
 
                     if not click_ok:
                         for result in results_mizu + results_hi + results_zya:
@@ -1045,29 +1098,77 @@ class Action:
 
                     if click_ok:
                         pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
-                        pyautogui.click(result_radio[0], result_radio[1])
-                        time.sleep(1)
-                        pyautogui.press("tab")
+                        pyautogui.click(result_radio[0], result_radio[1], duration=0.5)
                         time.sleep(0.5)
-                        pyautogui.press("tab")
-                        time.sleep(0.5)
-                        pyautogui.press("x", presses=8, interval=0.2)
-                        pyautogui.press("tab")
-                        time.sleep(0.5)
-                        pyautogui.press("2")
-                        pyautogui.press("0", presses=13 if not is_shiro else 12, interval=0.2)
 
-                        JumpManager.jump_to_shuppin_result()
-                        JumpManager.jump_to_auction_from_shuppin_result()
-                        pyautogui.press("end")
+                        pyautogui.press("tab")  # 入札時間
                         time.sleep(0.5)
-                        JumpManager.jump_to_shuppin_select()
-                        break
+
+                        if ImageRecognizer.locate_center("send-id"):
+                            pyautogui.press("tab")  # 強制落札指定ID
+                            time.sleep(0.5)
+                            login_manager = LoginManager()
+                            account = login_manager.current_account
+                            pyautogui.write(account["options"].send_id, 0.3)
+                            time.sleep(0.5)
+
+                            pyautogui.press("tab")  # 落札金額
+                            time.sleep(0.5)
+                            pyautogui.press("2")
+                            pyautogui.press("0", presses=13 if not is_shiro else 12, interval=0.5)
+
+                            JumpManager.jump_to_shuppin_result()
+                            JumpManager.jump_to_auction_from_shuppin_result()
+                            pyautogui.press("end")
+                            time.sleep(0.5)
+                            JumpManager.jump_to_shuppin_select()
+                            break
+                        else:
+                            # 送信できないときはあきらめて関数を終了する
+                            return
+
                 if not click_ok:
                     break
             else:
                 break
-        Action.home()
+
+    @staticmethod
+    def buy_loop_all_rare_kouseki():
+        while True:
+            if ImageRecognizer.locate_center("rakusatsu-mati"):
+                results_radio = ImageRecognizer.locate_all("radio-button-2")
+
+                upper_limit_buy = 999999
+                result_zatta = ImageRecognizer.locate_center("auc-zatta")
+                if result_zatta:
+                    upper_limit_buy = result_zatta[1]
+
+                if results_radio:
+                    for result_radio in results_radio:
+                        if upper_limit_buy > result_radio[1]:
+                            pyautogui.moveTo(result_radio[0], result_radio[1], 0.2)
+                            pyautogui.click(result_radio[0], result_radio[1], duration=0.5)
+                            time.sleep(0.5)
+                            pyautogui.press("enter")
+
+                            current_time = time.time()
+                            # ページ遷移待ち
+                            while time.time() - current_time < 60:
+                                if ImageRecognizer.locate_center("kounyu-done"):
+                                    break
+                                elif ImageRecognizer.locate_center("no-empty"):
+                                    notifier = Notifier()
+                                    notifier.send_discord_message("🚨 倉庫がいっぱいで自働買い取りができませんでした。ペナルティを避けるため手動で改造を実行してください。")
+                                    sys.exit()
+                            wait_time_temp = random.randint(500, 1000)
+                            time.sleep(wait_time_temp/1000)
+
+                            JumpManager.jump_to_auction_from_shuppin_result()
+                            break
+                else:
+                    break
+            else:
+                break
 
 
 class HandleRecaptcha:
@@ -1320,10 +1421,21 @@ class Macro:
         notifier.send_discord_message("🚨 プログラムを終了します。手動で原因調査と復帰を試みてください。")
 
     @staticmethod
-    def collect_material(collect_mode: str, collect_yoroi: bool, collect_various_kouseki: bool, collect_iron: bool):
+    def collect_material():
         atexit.register(Macro.on_exit)
         notifier = Notifier()
         vpn_manager = VpnManager()
+
+        # collect option initialize
+        login_manager = LoginManager()
+        current_account_info = login_manager.get_current_account()
+        collect_mode = current_account_info["options"].collect_mode
+        collect_yoroi = current_account_info["options"].collect_yoroi
+        collect_various_kouseki = current_account_info["options"].collect_various_kouseki
+        collect_iron = current_account_info["options"].collect_iron
+        send_kouseki = current_account_info["options"].send_kouseki
+        auto_buy = current_account_info["options"].auto_buy
+
         idling_time = 0
 
         # 初期画面がステータス画面かどうかでイニシャライズ方法を変える。
@@ -1354,15 +1466,32 @@ class Macro:
             if collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
             Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron)
+
+            if send_kouseki:
+                Action.go_to_send_all_rare_kouseki()
+
+            if auto_buy:
+                Action.go_to_buy_all_rare_kouseki()
+
+            Action.go_to_update_kouseki_num()
             notifier.send_account_info()
 
-            grind_duration_sec = random.randint(3000, 7500)
+            grind_duration_sec = random.randint(3000, 7200)
             grind_start_time = time.time()
             while time.time() - grind_start_time < grind_duration_sec:
-                login_manager = LoginManager()
                 if login_manager.check_account_switch():
                     notifier.send_discord_message(
                         "⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
+
+                    # collect option initialize
+                    current_account_info = login_manager.get_current_account()
+                    collect_mode = current_account_info["options"].collect_mode
+                    collect_yoroi = current_account_info["options"].collect_yoroi
+                    collect_various_kouseki = current_account_info["options"].collect_various_kouseki
+                    collect_iron = current_account_info["options"].collect_iron
+                    send_kouseki = current_account_info["options"].send_kouseki
+                    auto_buy = current_account_info["options"].auto_buy
+
                     if not vpn_manager.use_vpn:
                         rest_time_min = 30
                         notifier.send_discord_message(
@@ -1538,6 +1667,7 @@ class ImageRecognizer:
         "recaptcha-success": {"filename": "recaptcha-success.png", "confidence": 0.8, "region": (1, 122, 725, 912)},
         "is-auc": {"filename": "is-auction.png", "confidence": 0.8, "region": (1, 217, 549, 314)},
         "is-shuppin": {"filename": "is-shuppin.png", "confidence": 0.8, "region": (384, 144, 1038, 878)},
+        "is-shuppin2": {"filename": "is-shuppin2.png", "confidence": 0.8, "region": (384, 144, 1038, 878)},
         "shuppin-done": {"filename": "shuppin-done.png", "confidence": 0.8, "region": (1, 120, 539, 239)},
         "is-champ": {"filename": "is-champ.png", "confidence": 0.8, "region": (5, 122, 1877, 163)},
         "cloudflare-check-02": {"filename": "cloudflare-check-02.png", "confidence": 0.8,
@@ -1570,6 +1700,12 @@ class ImageRecognizer:
         "penalty": {"filename": "penalty.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
         "rest-kankoku": {"filename": "rest-kankoku.png", "confidence": 0.8, "region": (1, 1, 1905, 502)},
         "iron-10000": {"filename": "iron-10000.png", "confidence": 0.8, "region": (350, 1, 1000, 1)},
+        "send-id": {"filename": "send-id.png", "confidence": 0.75, "region": (760, 123, 848, 902)},
+        "no-empty": {"filename": "no-empty.png", "confidence": 0.75, "region": (1, 122, 1780, 800)},
+        "rakusatsu": {"filename": "rakusatsu.png", "confidence": 0.75, "region": (60, 122, 1780, 800)},
+        "rakusatsu-mati": {"filename": "rakusatsu-mati.png", "confidence": 0.75, "region": (60, 122, 1780, 800)},
+        "kounyu-done": {"filename": "kounyu-done.png", "confidence": 0.75, "region": (1, 122, 1780, 800)},
+        "auc-zatta": {"filename": "auc-zatta.png", "confidence": 0.75, "region": (1, 122, 1780, 900)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
