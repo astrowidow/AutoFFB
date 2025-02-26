@@ -53,5 +53,5 @@ def test_locate_and_visualize(key, output_filename="output.png"):
 
 # テスト実行
 if __name__ == "__main__":
-    test_key = "kouseki-mizu"  # テストしたいキーを指定
+    test_key = "to-status"  # テストしたいキーを指定
     test_locate_and_visualize(test_key, test_key+"_result.png")

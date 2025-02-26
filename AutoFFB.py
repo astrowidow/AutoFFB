@@ -22,7 +22,8 @@ import math
 import pyperclip
 from bs4 import BeautifulSoup
 from collections import Counter
-import lxml
+import pickle
+from lxml import html
 
 
 class IPManager:
@@ -275,6 +276,10 @@ class JumpManager:
                     react_keitai=react_keitai).jump_with_confirmation()
 
     @staticmethod
+    def jump_to_kajiya():
+        JumpHandler("kajiya", "is-kajiya", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
+
+    @staticmethod
     def jump_to_auction_from_status():
         JumpHandler("auc", "is-auc", time_after_confirmation_range=(549, 1536)).jump_with_confirmation()
 
@@ -407,6 +412,8 @@ class LoginManager:
             send_kouseki = False
             send_id = "xxxxxxxx"
             auto_buy = False
+            auto_kaizou = False
+            kaizou_name = ""
 
     def __new__(cls):
         if cls._instance is None:
@@ -747,6 +754,211 @@ class AccountInfo:
         return Counter()  # 指定したタイトルが見つからなかった場合
 
 
+class KaizouStatus:
+    RECIPE = ["水", "白", "火", "白", "水", "白", "白", "邪", "白", "白"]
+    KOUSEKI_NAME_DIC = {
+        "水": "水のアクアマリン",
+        "火": "火のルビー",
+        "邪": "邪のオブシダン",
+        "白": "白マテリア",
+    }
+
+    def __init__(self, weapon_name):
+        self.weapon_name = weapon_name  # 改造対象の武器名
+        self.is_needed_done_check = False  # 改造の完了チェックが必要か
+        self._recipe_index = 0  # レシピの現在位置
+        self.attack_expected_after_kaizou = 0
+
+    def get_next_kouseki(self):
+        """次の改造に使用する鉱石を取得（ループ）"""
+        kouseki = self.RECIPE[self._recipe_index]
+        return kouseki
+
+    def check_done(self):
+        """改造を一つ進める"""
+        self.is_needed_done_check = False
+        self._recipe_index = (self._recipe_index + 1) % len(self.RECIPE)  # インデックスをループ
+        self.save_to_pickle()
+
+    def save_to_pickle(self):
+        """インスタンスをピックルに保存（武器名をファイル名に）"""
+        filename = f"{self.weapon_name}.pkl"
+        with open(filename, 'wb') as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load_from_pickle(cls, filename):
+        """ピックルからインスタンスを読み込む"""
+        with open(filename, 'rb') as f:
+            return pickle.load(f)
+
+    @classmethod
+    def create_from_weapon_name(cls, weapon_name):
+        """武器名からインスタンスを自動取得（存在すればロード、なければ新規作成）"""
+        filename = f"{weapon_name}.pkl"
+        if os.path.exists(filename):
+            return cls.load_from_pickle(filename)
+        else:
+            return cls(weapon_name)
+
+    def update_next_to_do(self):
+        pyautogui.hotkey("ctrl", "u")
+        time.sleep(2)
+        pyautogui.hotkey("ctrl", "a")
+        time.sleep(2)
+        pyautogui.hotkey("ctrl", "c")
+        time.sleep(2)
+        pyautogui.hotkey("ctrl", "w")
+        html_content = pyperclip.paste()
+
+        weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
+        if self.is_needed_done_check:
+            if math.isclose(attack_power, self.attack_expected_after_kaizou, rel_tol=1e-6):
+                self.check_done()
+            else:
+                self.is_needed_done_check = False
+
+        next_kouseki = self.get_next_kouseki()
+        kouseki_position = self.get_kouseki_position(html_content, self.KOUSEKI_NAME_DIC[next_kouseki])
+
+        if next_kouseki == "白":
+            magnification = 2
+        else:
+            magnification = 4
+        self.attack_expected_after_kaizou = attack_power*magnification
+
+        return weapon_position, kouseki_position
+
+    def execute_next_kaizou(self, weapon_position, kouseki_position):
+        pyautogui.press('tab')
+        time.sleep(0.5)
+        if weapon_position == 0:
+            pyautogui.press('down')
+            time.sleep(0.2)
+            pyautogui.press('up')
+            time.sleep(0.5)
+        else:
+            pyautogui.press('down', presses=weapon_position, interval=0.2)
+            time.sleep(0.5)
+
+        pyautogui.press('tab')
+        time.sleep(0.5)
+        if kouseki_position == 0:
+            pyautogui.press('down')
+            time.sleep(0.2)
+            pyautogui.press('up')
+            time.sleep(0.5)
+        else:
+            pyautogui.press('down', presses=kouseki_position, interval=0.2)
+            time.sleep(0.5)
+
+        self.is_needed_done_check = True
+        self.save_to_pickle()
+        pyautogui.press('enter')
+
+    def kaizou_loop(self):
+        while True:
+            weapon_position, kouseki_position = self.update_next_to_do()
+            if weapon_position is None or kouseki_position is None:
+                break
+            self.execute_next_kaizou(weapon_position, kouseki_position)
+            start_time = time.time()
+            is_timeout = False
+
+            while True:
+                if ImageRecognizer.locate_center("kaizou-success"):
+                    print("改造成功")
+                    self.check_done()
+                    break
+                elif ImageRecognizer.locate_center("kaizou-stop"):
+                    print("改造停止")
+                    self.check_done()
+                    notifier = Notifier()
+                    notifier.send_discord_message("🚨 改造が停止しました。")
+                    sys.exit()
+                elif time.time() - start_time > 20:
+                    print("改造失敗？")
+                    self.is_needed_done_check = True
+                    self.save_to_pickle()
+                    is_timeout = True
+                    break
+                time.sleep(0.5)
+
+            time.sleep(1)
+            JumpManager.jump_to_kajiya()
+
+            if is_timeout:
+                break
+
+    @staticmethod
+    def get_weapon_info(html_source, weapon_name):
+        """
+        指定されたHTMLコンテンツから、武器名を検索し、
+        その位置（上から何番目か）と攻撃力を取得する関数。
+
+        :param html_source: HTMLの文字列
+        :param weapon_name: 探したい武器名
+        :return: (武器の位置（1始まりのインデックス）, 攻撃力), 見つからない場合は (-1, None)
+        """
+        tree = html.fromstring(html_source)
+        weapon_names = []
+        weapon_attacks = []
+
+        # 各ラジオボタンのあるセルを取得
+        radio_cells = tree.xpath("//td[input[@type='radio']]")
+
+        for cell in radio_cells:
+            # 「名称」列はラジオボタンの次の td 要素
+            name_td = cell.xpath("following-sibling::td[1]")
+            attack_td = cell.xpath("following-sibling::td[2]")  # 攻撃力の列
+
+            if name_td and name_td[0].text is not None:
+                weapon_names.append(name_td[0].text.strip())
+                attack = attack_td[0].text.strip() if attack_td and attack_td[0].text is not None else None
+                weapon_attacks.append(attack)
+            else:
+                weapon_names.append("-")
+                weapon_attacks.append(None)
+
+        # 指定された武器のインデックスを取得（見つかった場合は 1始まりのインデックスに変換）
+        try:
+            index = weapon_names.index(weapon_name)
+            position = index  # 1-based index
+            attack_power = float(weapon_attacks[index])
+        except ValueError:
+            position = None
+            attack_power = None
+
+        return position, attack_power
+
+    @staticmethod
+    def get_kouseki_position(html_source, kouseki_name):
+        soup = BeautifulSoup(html_source, 'lxml')
+
+        # 全てのテーブルを取得
+        tables = soup.find_all('table')
+        if len(tables) < 2:
+            return None
+
+        # 鉱石リストのテーブルを取得
+        kouseki_table = tables[2]  # 2番目のテーブルが鉱石リストと仮定
+        rows = kouseki_table.find_all('tr')
+
+        kousekis = []
+        for row in rows:
+            cols = row.find_all('td')
+            if len(cols) > 1 and not cols[1].find('input'):  # アイテム名が存在する列を抽出
+                name = cols[1].text.strip()
+                if name and name != "-":
+                    kousekis.append(name)
+
+        try:
+            position = kousekis.index(kouseki_name)
+            return position
+        except ValueError:
+            return None
+
+
 class Action:
     @staticmethod
     def reset(show_message=False):
@@ -885,6 +1097,15 @@ class Action:
                 JumpManager.jump_to_next_saishu()
             else:
                 JumpManager.jump_to_status()
+
+    @staticmethod
+    def go_to_kaizou(login_account: dict):
+        Action.home()
+        if ImageRecognizer.locate_center("kajiya"):
+            JumpManager.jump_to_kajiya()
+            kaizou_st = KaizouStatus.create_from_weapon_name(login_account["options"].kaizou_name)
+            kaizou_st.kaizou_loop()
+        Action.home()
 
     @staticmethod
     def go_to_sell_all_gomi_kouseki(login_account: dict):
@@ -1159,9 +1380,7 @@ class Action:
                                 if ImageRecognizer.locate_center("kounyu-done"):
                                     break
                                 elif ImageRecognizer.locate_center("no-empty"):
-                                    notifier = Notifier()
-                                    notifier.send_discord_message("🚨 倉庫がいっぱいで自働買い取りができませんでした。ペナルティを避けるため手動で改造を実行してください。")
-                                    sys.exit()
+                                    return
                             wait_time_temp = random.randint(500, 1000)
                             time.sleep(wait_time_temp/1000)
 
@@ -1468,6 +1687,9 @@ class Macro:
             if current_account_info["options"].auto_buy:
                 Action.go_to_buy_all_rare_kouseki()
 
+            if current_account_info["options"].auto_kaizou:
+                Action.go_to_kaizou(current_account_info)
+
             Action.go_to_update_kouseki_num()
             notifier.send_account_info()
 
@@ -1694,6 +1916,10 @@ class ImageRecognizer:
         "rakusatsu-mati": {"filename": "rakusatsu-mati.png", "confidence": 0.75, "region": (60, 122, 1780, 800)},
         "kounyu-done": {"filename": "kounyu-done.png", "confidence": 0.75, "region": (1, 122, 1780, 800)},
         "auc-zatta": {"filename": "auc-zatta.png", "confidence": 0.75, "region": (1, 122, 1780, 900)},
+        "is-kajiya": {"filename": "is-kajiya.png", "confidence": 0.8, "region": (1, 120, 713, 214)},
+        "kaizou-stop": {"filename": "kaizou-stop.png", "confidence": 0.8, "region": (1, 122, 1780, 800)},
+        "kaizou-success": {"filename": "kaizou-success.png", "confidence": 0.8, "region": (1, 122, 1780, 800)},
+        "kajiya": {"filename": "kajiya.png", "confidence": 0.75, "region": (1, 122, 1780, 800)},
     }
 
     IMAGE_FOLDER = "temp-image"  # 画像フォルダのパス
