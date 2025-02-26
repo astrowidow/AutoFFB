@@ -803,12 +803,13 @@ class KaizouStatus:
 
     def update_next_to_do(self):
         pyautogui.hotkey("ctrl", "u")
-        time.sleep(2)
+        time.sleep(0.5)
         pyautogui.hotkey("ctrl", "a")
-        time.sleep(2)
+        time.sleep(0.5)
         pyautogui.hotkey("ctrl", "c")
-        time.sleep(2)
+        time.sleep(0.5)
         pyautogui.hotkey("ctrl", "w")
+        time.sleep(0.5)
         html_content = pyperclip.paste()
 
         weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
@@ -834,22 +835,22 @@ class KaizouStatus:
         time.sleep(0.5)
         if weapon_position == 0:
             pyautogui.press('down')
-            time.sleep(0.2)
+            time.sleep(0.3)
             pyautogui.press('up')
             time.sleep(0.5)
         else:
-            pyautogui.press('down', presses=weapon_position, interval=0.2)
+            pyautogui.press('down', presses=weapon_position, interval=0.3)
             time.sleep(0.5)
 
         pyautogui.press('tab')
         time.sleep(0.5)
         if kouseki_position == 0:
             pyautogui.press('down')
-            time.sleep(0.2)
+            time.sleep(0.3)
             pyautogui.press('up')
             time.sleep(0.5)
         else:
-            pyautogui.press('down', presses=kouseki_position, interval=0.2)
+            pyautogui.press('down', presses=kouseki_position, interval=0.3)
             time.sleep(0.5)
 
         self.is_needed_done_check = True
