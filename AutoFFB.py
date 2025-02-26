@@ -860,8 +860,12 @@ class KaizouStatus:
     def kaizou_loop(self):
         while True:
             weapon_position, kouseki_position = self.update_next_to_do()
-            if weapon_position is None or kouseki_position is None:
+            if kouseki_position is None:
                 break
+            if weapon_position is None:
+                notifier = Notifier()
+                notifier.send_discord_message("⚠️ 存在しない武器名が改造対象として指定されています。")
+                sys.exit()
             self.execute_next_kaizou(weapon_position, kouseki_position)
             start_time = time.time()
             is_timeout = False
@@ -946,18 +950,24 @@ class KaizouStatus:
         rows = kouseki_table.find_all('tr')
 
         kousekis = []
+        target_num = 0
         for row in rows:
             cols = row.find_all('td')
             if len(cols) > 1 and not cols[1].find('input'):  # アイテム名が存在する列を抽出
                 name = cols[1].text.strip()
-                if name and name != "-":
+                if name:
                     kousekis.append(name)
+                    if name == kouseki_name:
+                        target_num += 1
 
-        try:
-            position = kousekis.index(kouseki_name)
-            return position
-        except ValueError:
+        if target_num <= 1 and kouseki_name == "白マテリア":
             return None
+        else:
+            try:
+                position = kousekis.index(kouseki_name)
+                return position
+            except ValueError:
+                return None
 
 
 class Action:
