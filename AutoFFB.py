@@ -403,8 +403,7 @@ class LoginManager:
         def __init__(self):
             collect_mode = "saishu"
             collect_yoroi = False
-            collect_various_kouseki = False
-            collect_iron = False
+            collect_kouseki_list = ["水", "邪", "火", "鉄"]
             send_kouseki = False
             send_id = "xxxxxxxx"
             auto_buy = False
@@ -667,14 +666,14 @@ class AccountInfo:
             self.optimal_zya_num = 1
             return
 
-        # 白を 8 としたときのスケール
-        scale = self.shiro_num / 8.0
+        # 白を 6 としたときのスケール
+        scale = self.shiro_num / 6.0
 
         # 各鉱石の最適値を計算（切り上げ）
         tiny_value = 0.5  # 白に対してピッタりの比率ではなく、少し余裕を持った数字にしておく。
-        self.optimal_mizu_num = math.ceil(6 * scale + tiny_value) + 4
-        self.optimal_hi_num = math.ceil(3 * scale + tiny_value) + 2
-        self.optimal_zya_num = math.ceil(3 * scale + tiny_value) + 2
+        self.optimal_mizu_num = math.ceil(2 * scale + tiny_value) + 2
+        self.optimal_hi_num = math.ceil(1 * scale + tiny_value) + 1
+        self.optimal_zya_num = math.ceil(1 * scale + tiny_value) + 1
 
     def judge_kouseki_necessity(self, kouseki_type):
         """
@@ -888,14 +887,14 @@ class Action:
                 JumpManager.jump_to_status()
 
     @staticmethod
-    def go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron):
+    def go_to_sell_all_gomi_kouseki(login_account: dict):
         Action.home()
         if ImageRecognizer.locate_center("auc"):
             JumpManager.jump_to_auction_from_status()
             pyautogui.press("end")
             time.sleep(0.5)
             JumpManager.jump_to_shuppin_select()
-            Action.sell_loop_all_gomi_kouseki(collect_various_kouseki, collect_iron)
+            Action.sell_loop_all_gomi_kouseki(login_account)
         Action.home()
 
     @staticmethod
@@ -975,8 +974,9 @@ class Action:
                 break
 
     @staticmethod
-    def sell_loop_all_gomi_kouseki(collect_various_kouseki, collect_iron):
+    def sell_loop_all_gomi_kouseki(login_account: dict):
         forbidden_range = 4
+        collect_kouseki_list = login_account["options"].collect_kouseki_list
 
         while True:
             account_info = AccountInfo()
@@ -1011,7 +1011,7 @@ class Action:
                             click_ok = False
                             break
 
-                    if collect_various_kouseki:
+                    if "水" in collect_kouseki_list:
                         for result in results_mizu:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
@@ -1020,6 +1020,7 @@ class Action:
                                     click_ok = False
                                     break
 
+                    if "火" in collect_kouseki_list:
                         for result in results_hi:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
@@ -1028,6 +1029,7 @@ class Action:
                                     click_ok = False
                                     break
 
+                    if "邪" in collect_kouseki_list:
                         for result in results_zya:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
@@ -1036,7 +1038,7 @@ class Action:
                                     click_ok = False
                                     break
 
-                    if collect_iron:
+                    if "鉄" in collect_kouseki_list:
                         for result_iron in results_iron:
                             lower_limit_y = result_iron[1] - forbidden_range
                             upper_limit_y = result_iron[1] + forbidden_range
@@ -1429,13 +1431,6 @@ class Macro:
         # collect option initialize
         login_manager = LoginManager()
         current_account_info = login_manager.get_current_account()
-        collect_mode = current_account_info["options"].collect_mode
-        collect_yoroi = current_account_info["options"].collect_yoroi
-        collect_various_kouseki = current_account_info["options"].collect_various_kouseki
-        collect_iron = current_account_info["options"].collect_iron
-        send_kouseki = current_account_info["options"].send_kouseki
-        auto_buy = current_account_info["options"].auto_buy
-
         idling_time = 0
 
         # 初期画面がステータス画面かどうかでイニシャライズ方法を変える。
@@ -1463,14 +1458,14 @@ class Macro:
             Action.home()
             pyautogui.press("esc")
 
-            if collect_yoroi:
+            if current_account_info["options"].collect_yoroi:
                 Action.go_to_sell_all_gomi_yoroi()
-            Action.go_to_sell_all_gomi_kouseki(collect_various_kouseki, collect_iron)
+            Action.go_to_sell_all_gomi_kouseki(current_account_info)
 
-            if send_kouseki:
+            if current_account_info["options"].send_kouseki:
                 Action.go_to_send_all_rare_kouseki()
 
-            if auto_buy:
+            if current_account_info["options"].auto_buy:
                 Action.go_to_buy_all_rare_kouseki()
 
             Action.go_to_update_kouseki_num()
@@ -1482,15 +1477,7 @@ class Macro:
                 if login_manager.check_account_switch():
                     notifier.send_discord_message(
                         "⚠️ アカウント切り替え時刻になりました。切り替えシーケンスを開始します。")
-
-                    # collect option initialize
                     current_account_info = login_manager.get_current_account()
-                    collect_mode = current_account_info["options"].collect_mode
-                    collect_yoroi = current_account_info["options"].collect_yoroi
-                    collect_various_kouseki = current_account_info["options"].collect_various_kouseki
-                    collect_iron = current_account_info["options"].collect_iron
-                    send_kouseki = current_account_info["options"].send_kouseki
-                    auto_buy = current_account_info["options"].auto_buy
 
                     if not vpn_manager.use_vpn:
                         rest_time_min = 30
@@ -1509,6 +1496,7 @@ class Macro:
                 # ジャンプフラグを初期化して、このループ内で一度でもジャンプが行われたかどうかを監視する
                 JumpHandler.jump_used = False
                 start_time = time.time()
+                collect_mode = current_account_info["options"].collect_mode
                 if collect_mode == "manomori":
                     Macro.step_manomori()
                 elif collect_mode == "saishu":
