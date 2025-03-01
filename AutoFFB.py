@@ -590,36 +590,58 @@ class PenaltyCounter:
             self.initialized = True  # 2回目以降の `__init__` で再初期化しない
 
     def check_penalty(self):
-        if ImageRecognizer.locate_center("penalty"):
-            # 回数間違えるのが嫌なので慎重に待つ。
-            # オークションの鉱石カウントで、急ぎすぎると読み込み切れてない状態でコピペが行われて、カウントミスが生じた。
-            pyautogui.hotkey("ctrl", "u")
-            time.sleep(2)
-            pyautogui.hotkey("ctrl", "a")
-            time.sleep(2)
-            pyautogui.hotkey("ctrl", "c")
-            time.sleep(2)
-            pyautogui.hotkey("ctrl", "w")
-            html_content = pyperclip.paste()
-            self.penalty_count = AccountInfo.parse_penalty_count(html_content)
-            self.penalty_wait_offset_lower_limit_msec = max(0, self.penalty_count*100 - 100)
-            self.penalty_wait_offset_upper_limit_msec = max(0, self.penalty_count*400 - 800)
+        max_retries = 10  # 最大リトライ回数を設定
+        retry_count = 0
+        notifier = Notifier()
 
-            notifier = Notifier()
-            if self.penalty_count < 8:
-                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。")
-                time.sleep(30)
-                Action.reset(False)
-            elif self.penalty_count == 8:
-                login_manager = LoginManager()
-                wait_duration_sec = login_manager.get_seconds_until_next_switch() + 15*60  # 境界値考慮して15分足す
-                wait_duration_sec = wait_duration_sec % 6*60*60  # 6時間以上待つ必要はないので、あまりに長いようなら丸める。
-                notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。\n"
-                                              f"安全のため、次のアカウント切り替え時刻まで{wait_duration_sec/60}minスリープします。")
-                JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
-            else:
-                notifier.send_discord_message(f"🚨 ペナルティ警告数が {self.penalty_count}回になりました。")
-                sys.exit()
+        if ImageRecognizer.locate_center("penalty"):
+            while True:
+                # 回数間違えるのが嫌なので慎重に待つ。
+                # オークションの鉱石カウントで、急ぎすぎると読み込み切れてない状態でコピペが行われて、カウントミスが生じた。
+                pyautogui.hotkey("ctrl", "u")
+                time.sleep(2 + retry_count)
+                pyautogui.hotkey("ctrl", "a")
+                time.sleep(2 + retry_count)
+                pyautogui.hotkey("ctrl", "c")
+                time.sleep(2 + retry_count)
+                pyautogui.hotkey("ctrl", "w")
+                time.sleep(2 + retry_count)
+
+                html_content = pyperclip.paste()
+                self.penalty_count = AccountInfo.parse_penalty_count(html_content)
+
+                if self.penalty_count is None:
+                    retry_count += 1
+                    if retry_count >= max_retries:
+                        print("Max retries reached. Exiting loop.")
+                        notifier.send_discord_message(
+                            f"⚠️ ペナルティ警告数がHTMLから読み取れませんでした。retry_countは{retry_count}です。")
+                        notifier.send_discord_message(f"{html_content}")
+                        sys.exit()
+                    else:
+                        print(f"Retrying... ({retry_count}/{max_retries})")
+                        time.sleep(2)  # ちょっと待って再試行
+                        continue  # ループの最初に戻る
+
+                self.penalty_wait_offset_lower_limit_msec = self.penalty_count * 100
+                self.penalty_wait_offset_upper_limit_msec = self.penalty_count * 400
+
+                if self.penalty_count < 8:
+                    notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。")
+                    time.sleep(30)
+                    Action.reset(False)
+                elif self.penalty_count == 8:
+                    login_manager = LoginManager()
+                    wait_duration_sec = login_manager.get_seconds_until_next_switch() + 15*60  # 境界値考慮して15分足す
+                    wait_duration_sec = wait_duration_sec % 6*60*60  # 6時間以上待つ必要はないので、あまりに長いようなら丸める。
+                    notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。\n"
+                                                  f"安全のため、次のアカウント切り替え時刻まで{wait_duration_sec/60}minスリープします。")
+                    JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
+                else:
+                    notifier.send_discord_message(f"🚨 ペナルティ警告数が {self.penalty_count}回になりました。")
+                    sys.exit()
+
+                break  # 正常に取得できたらループを抜ける
 
 
 class VpnManager:
