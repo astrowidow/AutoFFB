@@ -414,6 +414,7 @@ class LoginManager:
             auto_buy = False
             auto_kaizou = False
             kaizou_name = ""
+            enable_optimal_kouseki = False
 
     def __new__(cls):
         if cls._instance is None:
@@ -1232,6 +1233,7 @@ class Action:
     def sell_loop_all_gomi_kouseki(login_account: dict):
         forbidden_range = 4
         collect_kouseki_list = login_account["options"].collect_kouseki_list
+        enable_optimal_kouseki = login_account["options"].enable_optimal_kouseki
 
         while True:
             account_info = AccountInfo()
@@ -1271,7 +1273,7 @@ class Action:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
                             if lower_limit_y <= result_radio[1] <= upper_limit_y:
-                                if account_info.judge_kouseki_necessity("mizu"):
+                                if account_info.judge_kouseki_necessity("mizu") or not enable_optimal_kouseki:
                                     click_ok = False
                                     break
 
@@ -1280,7 +1282,7 @@ class Action:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
                             if lower_limit_y <= result_radio[1] <= upper_limit_y:
-                                if account_info.judge_kouseki_necessity("hi"):
+                                if account_info.judge_kouseki_necessity("hi") or not enable_optimal_kouseki:
                                     click_ok = False
                                     break
 
@@ -1289,7 +1291,7 @@ class Action:
                             lower_limit_y = result[1] - forbidden_range
                             upper_limit_y = result[1] + forbidden_range
                             if lower_limit_y <= result_radio[1] <= upper_limit_y:
-                                if account_info.judge_kouseki_necessity("zya"):
+                                if account_info.judge_kouseki_necessity("zya") or not enable_optimal_kouseki:
                                     click_ok = False
                                     break
 
