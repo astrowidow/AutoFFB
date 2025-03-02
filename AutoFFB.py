@@ -616,7 +616,7 @@ class PenaltyCounter:
                         print("Max retries reached. Exiting loop.")
                         notifier.send_discord_message(
                             f"⚠️ ペナルティ警告数がHTMLから読み取れませんでした。retry_countは{retry_count}です。")
-                        notifier.send_discord_message(f"{html_content}")
+                        print(f"{html_content}")
                         sys.exit()
                     else:
                         print(f"Retrying... ({retry_count}/{max_retries})")
@@ -633,9 +633,10 @@ class PenaltyCounter:
                 elif self.penalty_count == 8:
                     login_manager = LoginManager()
                     wait_duration_sec = login_manager.get_seconds_until_next_switch() + 15*60  # 境界値考慮して15分足す
-                    wait_duration_sec = wait_duration_sec % 6*60*60  # 6時間以上待つ必要はないので、あまりに長いようなら丸める。
+                    wait_duration_sec = wait_duration_sec % (6*60*60)  # 6時間以上待つ必要はないので、あまりに長いようなら丸める。
                     notifier.send_discord_message(f"⚠️ ペナルティ警告がなされました。現在、警告数は {self.penalty_count}回です。\n"
                                                   f"安全のため、次のアカウント切り替え時刻まで{wait_duration_sec/60}minスリープします。")
+                    time.sleep(wait_duration_sec)
                     JumpHandler.jump_used = True  # 一定時間ジャンプがないとメインループでリセットが発動するのでそれの防止
                 else:
                     notifier.send_discord_message(f"🚨 ペナルティ警告数が {self.penalty_count}回になりました。")
