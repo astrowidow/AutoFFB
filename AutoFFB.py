@@ -721,7 +721,7 @@ class AccountInfo:
             raise ValueError("kouseki_type must be 'mizu', 'hi', or 'zya'")
 
     def update_current_kouseki_num(self):
-        if ImageRecognizer.locate_center("is-shuppin"):
+        if ImageRecognizer.locate_center("is-shuppin") or ImageRecognizer.locate_center("is-shuppin2"):
             pyautogui.hotkey("ctrl", "u")
             time.sleep(0.6)
             pyautogui.hotkey("ctrl", "a")
