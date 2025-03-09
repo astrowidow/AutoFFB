@@ -721,21 +721,38 @@ class AccountInfo:
             raise ValueError("kouseki_type must be 'mizu', 'hi', or 'zya'")
 
     def update_current_kouseki_num(self):
+        notifier = Notifier()
         if ImageRecognizer.locate_center("is-shuppin") or ImageRecognizer.locate_center("is-shuppin2"):
-            pyautogui.hotkey("ctrl", "u")
-            time.sleep(0.6)
-            pyautogui.hotkey("ctrl", "a")
-            time.sleep(0.5)
-            pyautogui.hotkey("ctrl", "c")
-            time.sleep(0.4)
-            pyautogui.hotkey("ctrl", "w")
-            html_content = pyperclip.paste()
-            kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
+            retry_count = 0
+            shiro_num_temp = 0
+            kouseki_counter = Counter()
+            while retry_count < 5:
+                pyautogui.hotkey("ctrl", "u")
+                time.sleep(0.6 + retry_count)
+                pyautogui.hotkey("ctrl", "a")
+                time.sleep(0.5 + retry_count)
+                pyautogui.hotkey("ctrl", "c")
+                time.sleep(0.4 + retry_count)
+                pyautogui.hotkey("ctrl", "w")
+                time.sleep(0.1 + retry_count)
+                html_content = pyperclip.paste()
+                kouseki_counter = AccountInfo.parse_item_from_html(html_content, "鉱石")
+                shiro_num_temp = kouseki_counter["白マテリア"]
+                if shiro_num_temp > 0:
+                    break
+                retry_count += 1
+
+            if shiro_num_temp == 0:
+                notifier.send_discord_message("⚠️ 鉱石数の情報が取得できませんでした")
+                sys.exit()
+
             self.mizu_num = kouseki_counter["水のアクアマリン"]
             self.hi_num = kouseki_counter["火のルビー"]
             self.zya_num = kouseki_counter["邪のオブシダン"]
-            self.shiro_num = kouseki_counter["白マテリア"]
+            self.shiro_num = shiro_num_temp
             self.calc_optimal_kouseki_ratio()
+        else:
+            notifier.send_discord_message("⚠️ 鉱石数のアップデートがしかるべきページで行われていません。")
 
     @staticmethod
     def parse_penalty_count(html_content):
@@ -826,17 +843,29 @@ class KaizouStatus:
             return cls(weapon_name)
 
     def update_next_to_do(self):
-        pyautogui.hotkey("ctrl", "u")
-        time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "a")
-        time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "c")
-        time.sleep(0.5)
-        pyautogui.hotkey("ctrl", "w")
-        time.sleep(0.5)
-        html_content = pyperclip.paste()
+        retry_count = 0
+        weapon_position = None
+        attack_power = None
+        while retry_count < 5:
+            pyautogui.hotkey("ctrl", "u")
+            time.sleep(0.5 + retry_count*10)
+            pyautogui.hotkey("ctrl", "a")
+            time.sleep(0.5 + retry_count*10)
+            pyautogui.hotkey("ctrl", "c")
+            time.sleep(0.5 + retry_count*10)
+            pyautogui.hotkey("ctrl", "w")
+            time.sleep(0.5 + retry_count*10)
+            html_content = pyperclip.paste()
+            weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
+            if weapon_position is not None and attack_power is not None:
+                break
+            retry_count += 1
 
-        weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
+        if weapon_position is None or attack_power is None:
+            notifier = Notifier()
+            notifier.send_discord_message("改造中に武器名取得に失敗しました。一度プログラムを停止します。")
+            sys.exit()
+
         if self.is_needed_done_check:
             if math.isclose(attack_power, self.attack_expected_after_kaizou, rel_tol=1e-6):
                 self.check_done()
