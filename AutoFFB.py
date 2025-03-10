@@ -752,7 +752,9 @@ class AccountInfo:
             self.shiro_num = shiro_num_temp
             self.calc_optimal_kouseki_ratio()
         else:
-            notifier.send_discord_message("⚠️ 鉱石数のアップデートがしかるべきページで行われていません。")
+            self.optimal_mizu_num = 999
+            self.optimal_hi_num = 999
+            self.optimal_zya_num = 999
 
     @staticmethod
     def parse_penalty_count(html_content):
@@ -846,40 +848,42 @@ class KaizouStatus:
         retry_count = 0
         weapon_position = None
         attack_power = None
-        while retry_count < 5:
-            pyautogui.hotkey("ctrl", "u")
-            time.sleep(0.5 + retry_count*10)
-            pyautogui.hotkey("ctrl", "a")
-            time.sleep(0.5 + retry_count*10)
-            pyautogui.hotkey("ctrl", "c")
-            time.sleep(0.5 + retry_count*10)
-            pyautogui.hotkey("ctrl", "w")
-            time.sleep(0.5 + retry_count*10)
-            html_content = pyperclip.paste()
-            weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
-            if weapon_position is not None and attack_power is not None:
-                break
-            retry_count += 1
 
-        if weapon_position is None or attack_power is None:
-            notifier = Notifier()
-            notifier.send_discord_message("改造中に武器名取得に失敗しました。一度プログラムを停止します。")
-            sys.exit()
+        if ImageRecognizer.locate_center("is-kajiya"):
+            while retry_count < 10:
+                pyautogui.hotkey("ctrl", "u")
+                time.sleep(0.5 + retry_count*10)
+                pyautogui.hotkey("ctrl", "a")
+                time.sleep(0.5 + retry_count*10)
+                pyautogui.hotkey("ctrl", "c")
+                time.sleep(0.5 + retry_count*10)
+                pyautogui.hotkey("ctrl", "w")
+                time.sleep(0.5 + retry_count*10)
+                html_content = pyperclip.paste()
+                weapon_position, attack_power = self.get_weapon_info(html_content, self.weapon_name)
+                if weapon_position is not None and attack_power is not None:
+                    break
+                retry_count += 1
 
-        if self.is_needed_done_check:
-            if math.isclose(attack_power, self.attack_expected_after_kaizou, rel_tol=1e-6):
-                self.check_done()
+            if weapon_position is None or attack_power is None:
+                notifier = Notifier()
+                notifier.send_discord_message("⚠️ 改造中に武器名取得に失敗しました。一度プログラムを停止します。")
+                sys.exit()
+
+            if self.is_needed_done_check:
+                if math.isclose(attack_power, self.attack_expected_after_kaizou, rel_tol=1e-6):
+                    self.check_done()
+                else:
+                    self.is_needed_done_check = False
+
+            next_kouseki = self.get_next_kouseki()
+            kouseki_position = self.get_kouseki_position(html_content, self.KOUSEKI_NAME_DIC[next_kouseki])
+
+            if next_kouseki == "白":
+                magnification = 2
             else:
-                self.is_needed_done_check = False
-
-        next_kouseki = self.get_next_kouseki()
-        kouseki_position = self.get_kouseki_position(html_content, self.KOUSEKI_NAME_DIC[next_kouseki])
-
-        if next_kouseki == "白":
-            magnification = 2
-        else:
-            magnification = 4
-        self.attack_expected_after_kaizou = attack_power*magnification
+                magnification = 4
+            self.attack_expected_after_kaizou = attack_power*magnification
 
         return weapon_position, kouseki_position
 
