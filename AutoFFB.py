@@ -1029,6 +1029,31 @@ class KaizouStatus:
 
 class Action:
     @staticmethod
+    def reset_window(show_message=False):
+        try_num = 4
+        for _ in range(try_num):
+            pyautogui.hotkey("ctrl", "w")
+            time.sleep(1)
+
+        # ✅ Winキーと同じ効果があるショートカット。レジストリでWin無効のマシンもあるので。
+        pyautogui.hotkey("ctrl", "esc")
+        time.sleep(1)  # スタートメニューが開くのを待機
+
+        # ✅ "batch"呼び出し
+        pyautogui.write("__launch_chrome_VIRTUAL.bat", interval=0.2)
+        time.sleep(1)  # 入力が完了するのを待つ
+
+        # ✅ Enterキーを押してChromeを開く
+        pyautogui.press("enter")
+        time.sleep(2)  # Chromeの起動を待つ（環境によって調整）
+
+        # ✅ タブ増やす
+        pyautogui.hotkey("ctrl", "t")
+
+        # ✅ ログイン
+        Action.reset(show_message)
+
+    @staticmethod
     def reset(show_message=False):
         notifier = Notifier()
         if show_message:
@@ -1721,6 +1746,9 @@ class Macro:
         current_account_info = login_manager.get_current_account()
         idling_time = 0
 
+        if not ImageRecognizer.locate_center("ffb-icon"):
+            Action.reset_window()
+
         # 初期画面がステータス画面かどうかでイニシャライズ方法を変える。
         if ImageRecognizer.locate_center("isStatus"):
             notifier.send_discord_message("✅ FFBオート周回マクロが開始されました。オート周回を開始します。")
@@ -1814,7 +1842,10 @@ class Macro:
                 idling_thresh = 5  # min
                 if idling_time > 60*idling_thresh:
                     notifier.send_discord_message(f"⚠️ 突っかかっているみたいで、ページ遷移が{idling_thresh}分間行われていません。一度ログインし直します。")
-                    Action.reset(True)
+                    if ImageRecognizer.locate_center("ffb-icon"):
+                        Action.reset(True)
+                    else:
+                        Action.reset_window(True)
 
                 notifier.send_ok_post()
 
